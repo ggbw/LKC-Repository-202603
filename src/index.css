@@ -1,105 +1,142 @@
+@import '@fontsource/sora/300.css';
+@import '@fontsource/sora/400.css';
+@import '@fontsource/sora/500.css';
+@import '@fontsource/sora/600.css';
+@import '@fontsource/sora/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --bg: 220 14% 96%;
+    --background: 220 14% 96%;
+    --foreground: 215 28% 17%;
+    --sidebar-bg: 216 28% 7%;
+    --sidebar-hover: 215 20% 11%;
+    --sidebar-active: 215 14% 15%;
+    --accent-green: 136 55% 40%;
+    --accent-green-fg: 0 0% 100%;
+    --accent-blue: 215 89% 52%;
+    --accent-blue-fg: 0 0% 100%;
+    --accent-yellow: 42 79% 57%;
+    --accent-purple: 264 55% 59%;
+    --accent-purple-fg: 0 0% 100%;
+    --danger: 2 77% 62%;
+    --danger-fg: 0 0% 100%;
+    --surface: 0 0% 100%;
+    --surface2: 210 25% 98%;
+    --border: 213 24% 89%;
+    --text: 213 14% 15%;
+    --text2: 214 9% 42%;
+    --text3: 213 7% 57%;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(31,35,40,.12), 0 8px 24px rgba(31,35,40,.06);
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 213 14% 15%;
+    --primary: 136 55% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 25% 98%;
+    --secondary-foreground: 213 14% 15%;
+    --muted: 210 25% 98%;
+    --muted-foreground: 214 9% 42%;
+    --accent: 210 25% 98%;
+    --accent-foreground: 213 14% 15%;
+    --destructive: 2 77% 62%;
+    --destructive-foreground: 0 0% 100%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 213 14% 15%;
+    --input: 213 24% 89%;
+    --ring: 215 89% 52%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 216 28% 7%;
+    --sidebar-foreground: 213 7% 57%;
+    --sidebar-primary: 136 55% 40%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 215 14% 15%;
+    --sidebar-accent-foreground: 210 25% 92%;
+    --sidebar-border: 215 14% 15%;
+    --sidebar-ring: 215 89% 52%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
-
   body {
-    @apply bg-background text-foreground;
+    font-family: 'Sora', sans-serif;
+    background: hsl(var(--bg));
+    color: hsl(var(--text));
+    overflow: hidden;
+    height: 100vh;
+  }
+  #root {
+    height: 100vh;
+    overflow: hidden;
   }
 }
+
+/* Badge variants */
+.badge { display: inline-flex; align-items: center; border-radius: 5px; padding: 2px 8px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.badge-green { background: #dafbe1; color: #1a7f37; border: 1px solid #aceebb; }
+.badge-blue { background: #ddf4ff; color: #0969da; border: 1px solid #addcff; }
+.badge-yellow { background: #fff8c5; color: #9a6700; border: 1px solid #ffe07c; }
+.badge-red { background: #ffebe9; color: #cf222e; border: 1px solid #ffc1ba; }
+.badge-gray { background: #f6f8fa; color: #656d76; border: 1px solid #d0d7de; }
+.badge-purple { background: #fbefff; color: #8250df; border: 1px solid #d8b4fe; }
+.badge-orange { background: #fff1e5; color: #bc4c00; border: 1px solid #ffc680; }
+
+/* Grade chips */
+.grade { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; font-size: 11px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.gas, .ga { background: #dafbe1; color: #1a7f37; }
+.gb, .gc { background: #fff8c5; color: #9a6700; }
+.gd, .ge { background: #ffebe9; color: #cf222e; }
+.gu { background: #f6f8fa; color: #656d76; }
+
+/* Countdown tags */
+.countdown { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 5px; }
+.countdown.urgent { background: #ffebe9; color: #cf222e; }
+.countdown.soon { background: #fff8c5; color: #9a6700; }
+.countdown.ok { background: #dafbe1; color: #1a7f37; }
+.countdown.overdue-tag { background: #ffebe9; color: #cf222e; }
+.countdown.closed { background: #f6f8fa; color: #656d76; }
+
+/* Grade pill */
+.grade-pill { display: inline-flex; align-items: center; gap: 4px; background: #fbefff; border: 1px solid #d8b4fe; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; color: #8250df; font-family: 'JetBrains Mono', monospace; }
+
+/* Stats bar */
+.stats-bar { display: flex; gap: 3px; height: 6px; border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+.stats-bar div { transition: flex .4s ease; }
+
+/* File drop */
+.file-drop { border: 2px dashed hsl(var(--border)); border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: all .15s; background: hsl(var(--surface2)); }
+.file-drop:hover { border-color: hsl(var(--accent-blue)); background: #f0f6ff; }
+
+/* Animation */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+.page-animate { animation: fadeIn .18s ease; }
+
+/* Toast */
+.app-toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 18px; border-radius: 8px;
+  font-size: 12px; font-weight: 600; z-index: 999; color: #fff;
+  box-shadow: 0 4px 20px rgba(0,0,0,.2); display: flex; align-items: center; gap: 8px;
+  max-width: 340px; animation: fadeIn .18s ease;
+}
+
+/* Progress bar */
+.progress-track { height: 5px; background: #f0f2f5; border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, hsl(var(--accent-green)), hsl(var(--accent-blue))); transition: width .6s ease; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
