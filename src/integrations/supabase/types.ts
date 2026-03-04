@@ -397,6 +397,7 @@ export type Database = {
         Row: {
           academic_year: string | null
           admission_date: string | null
+          class_name: string | null
           created_at: string | null
           date_of_birth: string | null
           email: string | null
@@ -412,6 +413,7 @@ export type Database = {
         Insert: {
           academic_year?: string | null
           admission_date?: string | null
+          class_name?: string | null
           created_at?: string | null
           date_of_birth?: string | null
           email?: string | null
@@ -427,6 +429,7 @@ export type Database = {
         Update: {
           academic_year?: string | null
           admission_date?: string | null
+          class_name?: string | null
           created_at?: string | null
           date_of_birth?: string | null
           email?: string | null

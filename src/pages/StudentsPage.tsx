@@ -29,7 +29,7 @@ export default function StudentsPage() {
   const handleExport = () => {
     downloadExcel(rows.map((s: any) => ({
       'Enrollment': s.enrollment_number || '', 'Full Name': s.full_name, 'Form': s.form,
-      'Gender': cap(s.gender || ''), 'Status': cap(s.state || 'active'),
+      'Class': s.class_name || '', 'Gender': cap(s.gender || ''), 'Status': cap(s.state || 'active'),
       'Date of Birth': s.date_of_birth || '', 'Nationality': s.nationality || '',
       'Email': s.email || '', 'Admission Date': s.admission_date || '',
     })), 'students_export', 'Students');
@@ -83,7 +83,7 @@ export default function StudentsPage() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[12.5px]">
               <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-                {['Enrollment','Name','Form','Gender','Status', ...(isAdmin ? ['Actions'] : [])].map(h => (
+                {['Enrollment','Name','Form','Class','Gender','Status', ...(isAdmin ? ['Actions'] : [])].map(h => (
                   <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
                 ))}
               </tr></thead>
@@ -93,6 +93,7 @@ export default function StudentsPage() {
                     <td className="py-2.5 px-3.5 font-mono text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{s.enrollment_number || '—'}</td>
                     <td className="py-2.5 px-3.5 font-semibold cursor-pointer" style={{ color: '#1f6feb' }} onClick={() => setDetail(s.id)}>{s.full_name}</td>
                     <td className="py-2.5 px-3.5">{s.form}</td>
+                    <td className="py-2.5 px-3.5 text-[11px] font-mono">{s.class_name || '—'}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">{cap(s.gender || '')}</td>
                     <td className="py-2.5 px-3.5"><Badge status={s.state || 'active'} /></td>
                     {isAdmin && (
@@ -143,7 +144,7 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Card title="Personal Information">
-          {[['Date of Birth', formatDate(s.date_of_birth)], ['Gender', cap(s.gender || '')], ['Form', s.form], ['Enrollment', s.enrollment_number || '—'], ['Email', s.email || '—'], ['Nationality', s.nationality || '—'], ['Admission Date', formatDate(s.admission_date)]].map(([k, v]) => (
+          {[['Date of Birth', formatDate(s.date_of_birth)], ['Gender', cap(s.gender || '')], ['Form', s.form], ['Class', s.class_name || '—'], ['Enrollment', s.enrollment_number || '—'], ['Email', s.email || '—'], ['Nationality', s.nationality || '—'], ['Admission Date', formatDate(s.admission_date)]].map(([k, v]) => (
             <InfoRow key={k} label={k} value={v} />
           ))}
         </Card>
@@ -163,6 +164,7 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
   const [form, setForm] = useState(existing?.form || 'Form 1');
   const [gender, setGender] = useState(existing?.gender || 'male');
   const [enrollment, setEnrollment] = useState(existing?.enrollment_number || '');
+  const [className, setClassName] = useState(existing?.class_name || '');
   const [email, setEmail] = useState(existing?.email || '');
   const [state, setState] = useState(existing?.state || 'active');
   const [saving, setSaving] = useState(false);
@@ -171,11 +173,11 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
     if (!name.trim()) return;
     setSaving(true);
     if (id) {
-      const { error } = await supabase.from('students').update({ full_name: name, form, gender, enrollment_number: enrollment || null, email: email || null, state }).eq('id', id);
+      const { error } = await supabase.from('students').update({ full_name: name, form, gender, enrollment_number: enrollment || null, class_name: className || null, email: email || null, state }).eq('id', id);
       if (error) { showToast(error.message, 'error'); setSaving(false); return; }
       showToast('Student updated');
     } else {
-      const { error } = await supabase.from('students').insert({ full_name: name, form, gender, enrollment_number: enrollment || null, email: email || null, state: 'active' });
+      const { error } = await supabase.from('students').insert({ full_name: name, form, gender, enrollment_number: enrollment || null, class_name: className || null, email: email || null, state: 'active' });
       if (error) { showToast(error.message, 'error'); setSaving(false); return; }
       showToast(`Student "${name}" created`);
     }
@@ -191,9 +193,10 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
           <Field label="Full Name" required><FieldInput value={name} onChange={setName} /></Field>
           <Field label="Form" required><FieldSelect value={form} onChange={setForm} options={FORMS.map(f => ({ value: f, label: f }))} /></Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <Field label="Gender"><FieldSelect value={gender} onChange={setGender} options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} /></Field>
           <Field label="Enrollment #"><FieldInput value={enrollment} onChange={setEnrollment} /></Field>
+          <Field label="Class"><FieldInput value={className} onChange={setClassName} placeholder="e.g. B, M, K" /></Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Email"><FieldInput value={email} onChange={setEmail} type="email" /></Field>
