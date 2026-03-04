@@ -1,77 +1,113 @@
 import React from 'react';
-import { useApp, type Role, type PageId } from '@/context/AppContext';
-import { DB, TEACHERS, DEMO_TEACHER, DEMO_STUDENT, getMyAssignments, getMySubmission, isPastDue } from '@/data/database';
+import { useApp, type PageId } from '@/context/AppContext';
+import { useAuth, type AppRole } from '@/context/AuthContext';
 
 interface NavItem {
   sec?: string;
   id?: PageId;
   ico?: string;
   label?: string;
-  badge?: () => number | string;
-  badgeNew?: boolean;
 }
 
-function navItems(role: Role): NavItem[] {
-  if (role === 'student') {
-    return [
-      { sec: 'Main' },
-      { id: 'dashboard', ico: '🏠', label: 'Dashboard' },
-      { sec: 'Academic' },
-      { id: 'assignments', ico: '📝', label: 'My Assignments', badge: () => {
-        const pending = getMyAssignments().filter(a => !getMySubmission(a.id) && !isPastDue(a));
-        return pending.length || '';
-      }, badgeNew: true },
-    ];
+function navItems(primaryRole: AppRole, roles: AppRole[]): NavItem[] {
+  const isAdmin = roles.includes('admin');
+  const isTeacher = roles.includes('teacher');
+  const isHOD = roles.includes('hod');
+  const isHOY = roles.includes('hoy');
+  const isStudent = roles.includes('student');
+  const isParent = roles.includes('parent');
+
+  const items: NavItem[] = [];
+
+  // Dashboard - Admin, HOD, HOY only
+  if (isAdmin || isHOD || isHOY) {
+    items.push({ sec: 'Main' }, { id: 'dashboard', ico: '🏠', label: 'Dashboard' });
   }
-  if (role === 'teacher') {
-    return [
-      { sec: 'Main' },
-      { id: 'dashboard', ico: '🏠', label: 'Dashboard' },
-      { sec: 'Academic' },
-      { id: 'assignments', ico: '📝', label: 'Assignments', badge: () => DB.assignments.filter(a => a.teacher_id === DEMO_TEACHER.id).length, badgeNew: true },
-      { id: 'exams', ico: '📋', label: 'Examinations' },
-      { id: 'results', ico: '📊', label: 'Exam Results' },
-      { id: 'attendance', ico: '✅', label: 'Attendance' },
-      { sec: 'Reports' },
-      { id: 'hod', ico: '📈', label: 'HOD Analysis' },
-    ];
+
+  // Student view
+  if (isStudent) {
+    items.push({ sec: 'My School' });
+    items.push({ id: 'assignments', ico: '📝', label: 'My Assignments' });
+    items.push({ id: 'results', ico: '📊', label: 'My Results' });
+    items.push({ id: 'attendance', ico: '✅', label: 'My Attendance' });
   }
-  return [
-    { sec: 'Main' },
-    { id: 'dashboard', ico: '🏠', label: 'Dashboard' },
-    { sec: 'People' },
-    { id: 'students', ico: '🎓', label: 'Students', badge: () => DB.students.length },
-    { id: 'faculty', ico: '👩‍🏫', label: 'Teachers', badge: () => TEACHERS.length },
-    { id: 'parents', ico: '👪', label: 'Parents', badge: () => DB.parents.length },
-    { sec: 'Academic' },
-    { id: 'assignments', ico: '📝', label: 'Assignments', badge: () => DB.assignments.filter(a => a.state === 'published').length, badgeNew: true },
-    { id: 'exams', ico: '📋', label: 'Examinations' },
-    { id: 'results', ico: '📊', label: 'Exam Results' },
-    { id: 'attendance', ico: '✅', label: 'Attendance' },
-    { sec: 'Reports' },
-    { id: 'hod', ico: '📈', label: 'HOD Analysis' },
-    { sec: 'Config' },
-    { id: 'config', ico: '⚙️', label: 'Configuration' },
-  ];
+
+  // Parent view
+  if (isParent && !isAdmin) {
+    items.push({ sec: 'My Children' });
+    items.push({ id: 'students', ico: '🎓', label: 'My Children' });
+    items.push({ id: 'results', ico: '📊', label: 'Exam Results' });
+  }
+
+  // Teacher view
+  if (isTeacher) {
+    items.push({ sec: 'Academic' });
+    items.push({ id: 'assignments', ico: '📝', label: 'Assignments' });
+    items.push({ id: 'attendance', ico: '✅', label: 'Attendance' });
+    items.push({ id: 'results', ico: '📊', label: 'Exam Results' });
+  }
+
+  // HOD extras
+  if (isHOD) {
+    items.push({ sec: 'HOD' });
+    items.push({ id: 'hod', ico: '📈', label: 'Department Reports' });
+    items.push({ id: 'exams', ico: '📋', label: 'Examinations' });
+  }
+
+  // HOY extras
+  if (isHOY) {
+    items.push({ sec: 'HOY' });
+    items.push({ id: 'hod', ico: '📈', label: 'Year Reports' });
+  }
+
+  // Admin full access
+  if (isAdmin) {
+    items.push({ sec: 'People' });
+    items.push({ id: 'students', ico: '🎓', label: 'Students' });
+    items.push({ id: 'faculty', ico: '👩‍🏫', label: 'Teachers' });
+    items.push({ id: 'parents', ico: '👪', label: 'Parents' });
+    items.push({ sec: 'Academic' });
+    items.push({ id: 'assignments', ico: '📝', label: 'Assignments' });
+    items.push({ id: 'exams', ico: '📋', label: 'Examinations' });
+    items.push({ id: 'results', ico: '📊', label: 'Exam Results' });
+    items.push({ id: 'attendance', ico: '✅', label: 'Attendance' });
+    items.push({ sec: 'Reports' });
+    items.push({ id: 'hod', ico: '📈', label: 'HOD Analysis' });
+    items.push({ sec: 'Config' });
+    items.push({ id: 'config', ico: '⚙️', label: 'Configuration' });
+  }
+
+  // Everyone sees announcements
+  items.push({ sec: 'Info' });
+  items.push({ id: 'announcements' as PageId, ico: '📢', label: 'Announcements' });
+
+  return items;
 }
 
-const roleCfg: Record<Role, { avatar: string; bg: string; name: string; roleName: string; badge: string }> = {
-  admin: { avatar: '👑', bg: 'linear-gradient(135deg,#2ea043,#238636)', name: 'Administrator', roleName: 'Django Admin', badge: 'Admin View' },
-  teacher: { avatar: '👩‍🏫', bg: 'linear-gradient(135deg,#1f6feb,#0969da)', name: 'Ms. Makoni', roleName: 'Computer Science · IT', badge: 'Teacher View' },
-  student: { avatar: '🎓', bg: 'linear-gradient(135deg,#8250df,#6e40c9)', name: DEMO_STUDENT?.student_full_name || 'Student', roleName: 'Form 5 · Active', badge: 'Student View' },
+const roleBg: Record<string, string> = {
+  admin: 'linear-gradient(135deg,#2ea043,#238636)',
+  teacher: 'linear-gradient(135deg,#1f6feb,#0969da)',
+  student: 'linear-gradient(135deg,#8250df,#6e40c9)',
+  parent: 'linear-gradient(135deg,#bc4c00,#9a6700)',
+  hod: 'linear-gradient(135deg,#1f6feb,#0969da)',
+  hoy: 'linear-gradient(135deg,#1f6feb,#0969da)',
+};
+
+const roleIcon: Record<string, string> = {
+  admin: '👑', teacher: '👩‍🏫', student: '🎓', parent: '👪', hod: '📈', hoy: '📊',
 };
 
 export default function Sidebar() {
-  const { role, setRole, page, setPage, tick } = useApp();
-  const cfg = roleCfg[role];
-  const items = navItems(role);
+  const { page, setPage } = useApp();
+  const { profile, primaryRole, roles, signOut } = useAuth();
+  const items = navItems(primaryRole, roles);
 
   return (
     <div className="w-[230px] flex-shrink-0 flex flex-col overflow-y-auto" style={{ background: '#0d1117' }}>
       {/* Logo */}
-      <div className="px-4 pt-5 pb-4 border-b" style={{ borderColor: '#21262d' }}>
+      <div className="px-4 pt-4 pb-3 border-b" style={{ borderColor: '#21262d' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-lg flex-shrink-0" style={{ background: 'linear-gradient(135deg,#2ea043,#1f6feb)' }}>🏫</div>
+          <img src="/images/lkc-logo.jpeg" alt="LKC" className="w-9 h-9 rounded-full" />
           <div>
             <div className="text-[13px] font-bold" style={{ color: '#e6edf3' }}>LKC School</div>
             <div className="text-[10px] mt-px" style={{ color: '#484f58' }}>Management System</div>
@@ -79,19 +115,13 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Role Switcher */}
-      <div className="px-3 pt-3 pb-1">
-        <div className="text-[9px] font-semibold uppercase tracking-wider mb-1.5 pl-1" style={{ color: '#484f58' }}>Demo Role</div>
-        <div className="flex gap-2 rounded-lg p-1.5" style={{ background: '#0d1117' }}>
-          {(['admin', 'teacher', 'student'] as Role[]).map(r => (
-            <button key={r} onClick={() => setRole(r)}
-              className={`flex-1 py-1.5 px-2 border-none rounded-[5px] text-[11px] font-semibold cursor-pointer font-sans text-center transition-all ${role === r ? '' : ''}`}
-              style={{
-                background: role === r ? '#21262d' : 'transparent',
-                color: role === r ? '#e6edf3' : '#8b949e',
-              }}>
-              {r === 'admin' ? '👑 Admin' : r === 'teacher' ? '👩‍🏫 Teacher' : '🎓 Student'}
-            </button>
+      {/* Role badge */}
+      <div className="px-3 pt-2 pb-1">
+        <div className="flex flex-wrap gap-1">
+          {roles.map(r => (
+            <span key={r} className="text-[9px] font-semibold uppercase px-2 py-0.5 rounded" style={{ background: '#21262d', color: '#8b949e' }}>
+              {r}
+            </span>
           ))}
         </div>
       </div>
@@ -100,7 +130,6 @@ export default function Sidebar() {
       <nav className="flex-1 py-2">
         {items.map((item, i) => {
           if (item.sec) return <div key={i} className="px-4 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: '#484f58' }}>{item.sec}</div>;
-          const cnt = item.badge ? item.badge() : '';
           return (
             <div key={i} onClick={() => setPage(item.id!)}
               className="flex items-center gap-2.5 py-2 px-4 cursor-pointer text-[12.5px] select-none transition-all"
@@ -114,12 +143,6 @@ export default function Sidebar() {
               onMouseLeave={e => { if (page !== item.id) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#8b949e'; }}}>
               <span className="text-sm w-4 text-center flex-shrink-0">{item.ico}</span>
               {item.label}
-              {cnt !== '' && (
-                <span className={`ml-auto text-[9px] px-1.5 py-px rounded-[10px] font-mono ${item.badgeNew ? 'text-white' : ''}`}
-                  style={{ background: item.badgeNew ? '#2ea043' : '#21262d', color: item.badgeNew ? '#fff' : '#8b949e' }}>
-                  {cnt}
-                </span>
-              )}
             </div>
           );
         })}
@@ -127,13 +150,21 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="px-4 py-3" style={{ borderTop: '1px solid #21262d' }}>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-[7px] flex items-center justify-center text-[11px] font-bold flex-shrink-0" style={{ background: cfg.bg, color: '#fff' }}>{cfg.avatar}</div>
-          <div>
-            <div className="text-[11px] font-semibold" style={{ color: '#c9d1d9' }}>{cfg.name}</div>
-            <div className="text-[9px]" style={{ color: '#484f58' }}>{cfg.roleName}</div>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-7 h-7 rounded-[7px] flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+            style={{ background: roleBg[primaryRole] || roleBg.student, color: '#fff' }}>
+            {roleIcon[primaryRole] || '👤'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] font-semibold truncate" style={{ color: '#c9d1d9' }}>{profile?.full_name || 'User'}</div>
+            <div className="text-[9px] truncate" style={{ color: '#484f58' }}>{profile?.email}</div>
           </div>
         </div>
+        <button onClick={signOut}
+          className="w-full text-[10px] font-semibold py-1.5 rounded cursor-pointer border-none"
+          style={{ background: '#21262d', color: '#8b949e' }}>
+          Sign Out
+        </button>
       </div>
     </div>
   );
