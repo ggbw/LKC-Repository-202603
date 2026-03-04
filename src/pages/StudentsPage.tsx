@@ -14,6 +14,7 @@ export default function StudentsPage() {
   const { data: students = [], isLoading } = useStudents();
   const [search, setSearch] = useState('');
   const [filterForm, setFilterForm] = useState('');
+  const [filterClass, setFilterClass] = useState('');
   const [filterState, setFilterState] = useState('');
   const [modal, setModal] = useState<string | 'new' | null>(null);
   const invalidate = useInvalidate();
@@ -23,6 +24,7 @@ export default function StudentsPage() {
   const rows = students.filter((s: any) =>
     (!search || s.full_name.toLowerCase().includes(search.toLowerCase()) || (s.enrollment_number || '').toLowerCase().includes(search.toLowerCase())) &&
     (!filterForm || s.form === filterForm) &&
+    (!filterClass || s.class_name === filterClass) &&
     (!filterState || s.state === filterState)
   );
 
@@ -77,6 +79,7 @@ export default function StudentsPage() {
       <Card>
         <SearchBar value={search} onChange={setSearch} placeholder="🔍  Search name or enrollment...">
           <FilterSelect value={filterForm} onChange={setFilterForm} allLabel="All Forms" options={FORMS.map(f => ({ value: f, label: f }))} />
+          <FilterSelect value={filterClass} onChange={setFilterClass} allLabel="All Classes" options={[...new Set(students.map((s: any) => s.class_name).filter(Boolean))].sort().map(c => ({ value: c, label: c }))} />
           <FilterSelect value={filterState} onChange={setFilterState} allLabel="All Status" options={['active','suspended','graduated','transferred','inactive'].map(s => ({ value: s, label: cap(s) }))} />
         </SearchBar>
         {rows.length === 0 ? <div className="py-10 text-center text-xs" style={{ color: 'hsl(var(--text3))' }}>No students found</div> : (
