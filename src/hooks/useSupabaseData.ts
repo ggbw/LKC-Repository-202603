@@ -185,6 +185,30 @@ export function useProfiles() {
   });
 }
 
+export function useExams() {
+  return useQuery({
+    queryKey: ['exams'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('exams').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    }
+  });
+}
+
+export function useStudentSubjects(studentId?: string) {
+  return useQuery({
+    queryKey: ['student_subjects', studentId],
+    queryFn: async () => {
+      let q = supabase.from('student_subjects').select('*, students(full_name, form), subjects(name, code)');
+      if (studentId) q = q.eq('student_id', studentId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    }
+  });
+}
+
 // Utility: invalidate queries
 export function useInvalidate() {
   const qc = useQueryClient();

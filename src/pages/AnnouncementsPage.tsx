@@ -64,10 +64,10 @@ export default function AnnouncementsPage() {
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold">Announcements & Events</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{announcements.length} total</div></div>
+        <div><div className="text-lg font-bold"><i className="fas fa-bullhorn mr-2" />Announcements & Events</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{announcements.length} total</div></div>
         <div className="flex gap-2">
-          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
-          {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}>＋ New</Btn>}
+          <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
+          {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />New</Btn>}
         </div>
       </div>
 

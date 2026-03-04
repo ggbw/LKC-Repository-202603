@@ -54,13 +54,13 @@ export default function AttendancePage() {
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div className="text-lg font-bold">Attendance — {date}</div>
+        <div className="text-lg font-bold"><i className="fas fa-calendar-check mr-2" />Attendance — {date}</div>
         <div className="flex gap-2 items-center">
-          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+          <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
           {(isTeacher || isAdmin) && !marking && (
             <>
               <FilterSelect value={markingForm} onChange={setMarkingForm} allLabel="Select Form" options={FORMS.map(f => ({ value: f, label: f }))} />
-              <Btn onClick={startMarking} disabled={!markingForm}>＋ Mark Attendance</Btn>
+              <Btn onClick={startMarking} disabled={!markingForm}><i className="fas fa-plus mr-1" />Mark Attendance</Btn>
             </>
           )}
         </div>

@@ -69,11 +69,11 @@ export default function StudentsPage() {
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold">Students</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{students.length} total</div></div>
+        <div><div className="text-lg font-bold"><i className="fas fa-graduation-cap mr-2" />Students</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{students.length} total</div></div>
         <div className="flex gap-2">
-          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
-          {isAdmin && <Btn variant="outline" onClick={handleImport}>⬆ Import</Btn>}
-          {isAdmin && <Btn onClick={() => setModal('new')}>＋ New Student</Btn>}
+          <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
+          {isAdmin && <Btn variant="outline" onClick={handleImport}><i className="fas fa-upload mr-1" />Import</Btn>}
+          {isAdmin && <Btn onClick={() => setModal('new')}><i className="fas fa-plus mr-1" />New Student</Btn>}
         </div>
       </div>
       <Card>

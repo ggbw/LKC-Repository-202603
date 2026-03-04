@@ -36,17 +36,17 @@ export default function AssignmentsPage() {
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold">Assignments</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{assignments.length} total</div></div>
+        <div><div className="text-lg font-bold"><i className="fas fa-tasks mr-2" />Assignments</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{assignments.length} total</div></div>
         <div className="flex gap-2">
-          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
-          {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}>＋ Create Assignment</Btn>}
+          <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
+          {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />Create Assignment</Btn>}
         </div>
       </div>
 
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))' }}>
-        <StatCard icon="📝" bg="#ddf4ff" value={assignments.length} label="Total" />
-        <StatCard icon="🟢" bg="#dafbe1" value={pubCount} label="Published" />
-        <StatCard icon="📬" bg="#fff8c5" value={submissions.length} label="Submissions" />
+        <StatCard icon="fas fa-tasks" bg="#ddf4ff" value={assignments.length} label="Total" />
+        <StatCard icon="fas fa-check-circle" bg="#dafbe1" value={pubCount} label="Published" />
+        <StatCard icon="fas fa-inbox" bg="#fff8c5" value={submissions.length} label="Submissions" />
       </div>
 
       <Card>
