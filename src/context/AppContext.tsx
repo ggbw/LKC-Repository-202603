@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { useAuth, type AppRole } from '@/context/AuthContext';
 
+export type PageId = 'dashboard' | 'students' | 'faculty' | 'parents' | 'exams' | 'results' | 'attendance' | 'hod' | 'config' | 'assignments' | 'announcements';
+
+// Keep Role for backward compat with existing pages
 export type Role = 'admin' | 'teacher' | 'student';
-export type PageId = 'dashboard' | 'students' | 'faculty' | 'parents' | 'exams' | 'results' | 'attendance' | 'hod' | 'config' | 'assignments';
 
 interface AppState {
   role: Role;
@@ -10,7 +13,6 @@ interface AppState {
   setPage: (p: PageId) => void;
   detail: number | null;
   setDetail: (id: number | null) => void;
-  // assignment-specific detail state
   asnDetail: number | null;
   setAsnDetail: (id: number | null) => void;
   asnSubDetail: number | null;
@@ -19,9 +21,7 @@ interface AppState {
   setStuAsnDetail: (id: number | null) => void;
   facDetail: number | null;
   setFacDetail: (id: number | null) => void;
-  // toast
   showToast: (msg: string, type?: string) => void;
-  // force re-render
   tick: number;
   refresh: () => void;
 }
@@ -30,7 +30,12 @@ const AppContext = createContext<AppState>(null!);
 export const useApp = () => useContext(AppContext);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [role, setRoleState] = useState<Role>('admin');
+  const { primaryRole } = useAuth();
+  
+  // Map primaryRole to legacy Role type for existing pages
+  const legacyRole: Role = primaryRole === 'admin' ? 'admin' : 
+    (primaryRole === 'teacher' || primaryRole === 'hod' || primaryRole === 'hoy') ? 'teacher' : 'student';
+
   const [page, setPageState] = useState<PageId>('dashboard');
   const [detail, setDetail] = useState<number | null>(null);
   const [asnDetail, setAsnDetail] = useState<number | null>(null);
@@ -42,14 +47,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(() => setTick(t => t + 1), []);
 
-  const setRole = useCallback((r: Role) => {
-    setRoleState(r);
-    setPageState('dashboard');
-    setDetail(null);
-    setAsnDetail(null);
-    setAsnSubDetail(null);
-    setStuAsnDetail(null);
-    setFacDetail(null);
+  const setRole = useCallback((_r: Role) => {
+    // No-op, role comes from auth now
   }, []);
 
   const setPage = useCallback((p: PageId) => {
@@ -68,7 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      role, setRole, page, setPage, detail, setDetail,
+      role: legacyRole, setRole, page, setPage, detail, setDetail,
       asnDetail, setAsnDetail, asnSubDetail, setAsnSubDetail,
       stuAsnDetail, setStuAsnDetail, facDetail, setFacDetail,
       showToast, tick, refresh,
