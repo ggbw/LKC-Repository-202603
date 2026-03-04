@@ -92,8 +92,8 @@ export default function Sidebar() {
   const items = navItems(roles);
 
   return (
-    <div className="w-[230px] flex-shrink-0 flex flex-col overflow-y-auto" style={{ background: '#0d1117' }}>
-      <div className="px-4 pt-4 pb-3 border-b" style={{ borderColor: '#21262d' }}>
+    <div className="w-[230px] flex-shrink-0 flex flex-col overflow-y-auto" style={{ background: '#1a3fa0' }}>
+      <div className="px-4 pt-4 pb-3 border-b" style={{ borderColor: 'rgba(255,255,255,0.15)' }}>
         <div className="flex items-center gap-2.5">
           <img src="/images/lkc-logo.jpeg" alt="LKC" className="w-9 h-9 rounded-full" />
           <div>
@@ -106,25 +106,25 @@ export default function Sidebar() {
       <div className="px-3 pt-2 pb-1">
         <div className="flex flex-wrap gap-1">
           {roles.map(r => (
-            <span key={r} className="text-[9px] font-semibold uppercase px-2 py-0.5 rounded" style={{ background: '#21262d', color: '#8b949e' }}>{r}</span>
+            <span key={r} className="text-[9px] font-semibold uppercase px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.15)', color: '#e0e7ff' }}>{r}</span>
           ))}
         </div>
       </div>
 
       <nav className="flex-1 py-2">
         {items.map((item, i) => {
-          if (item.sec) return <div key={i} className="px-4 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: '#484f58' }}>{item.sec}</div>;
+          if (item.sec) return <div key={i} className="px-4 pt-3 pb-1 text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.45)' }}>{item.sec}</div>;
           return (
             <div key={i} onClick={() => setPage(item.id!)}
               className="flex items-center gap-2.5 py-2 px-4 cursor-pointer text-[12.5px] select-none transition-all"
               style={{
-                borderLeft: `3px solid ${page === item.id ? '#1a3fa0' : 'transparent'}`,
-                background: page === item.id ? '#21262d' : 'transparent',
-                color: page === item.id ? '#e6edf3' : '#8b949e',
-                fontWeight: page === item.id ? 500 : 400,
+                borderLeft: `3px solid ${page === item.id ? '#ffffff' : 'transparent'}`,
+                background: page === item.id ? 'rgba(255,255,255,0.15)' : 'transparent',
+                color: page === item.id ? '#ffffff' : 'rgba(255,255,255,0.7)',
+                fontWeight: page === item.id ? 600 : 400,
               }}
-              onMouseEnter={e => { if (page !== item.id) { (e.currentTarget as HTMLElement).style.background = '#161b22'; (e.currentTarget as HTMLElement).style.color = '#c9d1d9'; }}}
-              onMouseLeave={e => { if (page !== item.id) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#8b949e'; }}}>
+              onMouseEnter={e => { if (page !== item.id) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = '#ffffff'; }}}
+              onMouseLeave={e => { if (page !== item.id) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.7)'; }}}>
               <i className={`${item.ico} text-[12px] w-4 text-center flex-shrink-0`} />
               {item.label}
             </div>
@@ -132,19 +132,19 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="px-4 py-3" style={{ borderTop: '1px solid #21262d' }}>
+      <div className="px-4 py-3" style={{ borderTop: '1px solid rgba(255,255,255,0.15)' }}>
         <div className="flex items-center gap-2 mb-2">
           <div className="w-7 h-7 rounded-[7px] flex items-center justify-center text-[11px] font-bold flex-shrink-0"
             style={{ background: roleBg[primaryRole] || roleBg.student, color: '#fff' }}>
             <i className={roleIcon[primaryRole] || 'fas fa-user'} style={{ fontSize: '11px' }} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-[11px] font-semibold truncate" style={{ color: '#c9d1d9' }}>{profile?.full_name || 'User'}</div>
-            <div className="text-[9px] truncate" style={{ color: '#484f58' }}>{profile?.email}</div>
+            <div className="text-[11px] font-semibold truncate" style={{ color: '#ffffff' }}>{profile?.full_name || 'User'}</div>
+            <div className="text-[9px] truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{profile?.email}</div>
           </div>
         </div>
         <button onClick={signOut} className="w-full text-[10px] font-semibold py-1.5 rounded cursor-pointer border-none"
-          style={{ background: '#21262d', color: '#8b949e' }}>
+          style={{ background: 'rgba(255,255,255,0.15)', color: '#ffffff' }}>
           <i className="fas fa-sign-out-alt mr-1" /> Sign Out
         </button>
       </div>
