@@ -5,8 +5,9 @@ import { useAuth } from '@/context/AuthContext';
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Dashboard', students: 'Students', faculty: 'Teachers',
   parents: 'Parents', exams: 'Examinations', results: 'Exam Results',
-  attendance: 'Attendance', hod: 'HOD Analysis', config: 'Configuration',
-  assignments: 'Assignments', announcements: 'Announcements',
+  attendance: 'Attendance', hod: 'HOD Analysis', hoy: 'HOY Analysis',
+  config: 'Configuration', assignments: 'Assignments', announcements: 'Announcements',
+  admission: 'Admission Enquiries',
 };
 
 const roleBadge: Record<string, { bg: string; color: string; border: string; label: string }> = {
@@ -26,8 +27,7 @@ export default function Topbar() {
   return (
     <div className="h-[52px] flex items-center px-5 gap-3 flex-shrink-0 border-b" style={{ background: 'hsl(var(--surface))', borderColor: 'hsl(var(--border))' }}>
       <div className="text-xs flex items-center gap-1.5" style={{ color: 'hsl(var(--text2))' }}>
-        <span>LKC School</span>
-        <span>›</span>
+        <span>LKC School</span><span>›</span>
         <span className="font-semibold" style={{ color: 'hsl(var(--text))' }}>{PAGE_TITLES[page] || 'Dashboard'}</span>
       </div>
       <div className="ml-auto flex items-center gap-2.5">
