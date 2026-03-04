@@ -21,7 +21,7 @@ export default function ConfigPage() {
     <div className="page-animate">
       <div className="text-lg font-bold mb-4">Configuration</div>
       <div className="grid grid-cols-2 gap-3.5">
-        <Card title="📅 Academic Years">
+        <Card title={<><i className="fas fa-calendar-alt mr-1.5" />Academic Years</>}>
           {[{ y: '2026', s: 'active' }, { y: '2025', s: 'closed' }].map(({ y, s }) => (
             <div key={y} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
               <span style={{ color: 'hsl(var(--text2))' }}>{y}</span>
@@ -30,7 +30,7 @@ export default function ConfigPage() {
           ))}
         </Card>
 
-        <Card title={`📚 Subjects (${subjects.length})`}>
+        <Card title={<><i className="fas fa-book mr-1.5" />Subjects ({subjects.length})</>}>
           <div className="flex flex-wrap gap-1.5">
             {subjects.map((s: any) => (
               <span key={s.id} className="rounded-[5px] px-[9px] py-0.5 text-[11px]" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>
@@ -40,7 +40,7 @@ export default function ConfigPage() {
           </div>
         </Card>
 
-        <Card title="📈 HOD Assignments" titleRight={isAdmin && <Btn variant="outline" size="sm" onClick={() => setHodModal(true)}>＋ Assign</Btn>}>
+        <Card title={<><i className="fas fa-chart-line mr-1.5" />HOD Assignments</>} titleRight={isAdmin && <Btn variant="outline" size="sm" onClick={() => setHodModal(true)}>＋ Assign</Btn>}>
           {hodAssignments.length === 0 ? <div className="text-xs" style={{ color: 'hsl(var(--text3))' }}>No HOD assignments</div> : (
             hodAssignments.map((h: any) => (
               <div key={h.id} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
@@ -51,7 +51,7 @@ export default function ConfigPage() {
           )}
         </Card>
 
-        <Card title="📊 HOY Assignments" titleRight={isAdmin && <Btn variant="outline" size="sm" onClick={() => setHoyModal(true)}>＋ Assign</Btn>}>
+        <Card title={<><i className="fas fa-chart-pie mr-1.5" />HOY Assignments</>} titleRight={isAdmin && <Btn variant="outline" size="sm" onClick={() => setHoyModal(true)}>＋ Assign</Btn>}>
           {hoyAssignments.length === 0 ? <div className="text-xs" style={{ color: 'hsl(var(--text3))' }}>No HOY assignments</div> : (
             hoyAssignments.map((h: any) => (
               <div key={h.id} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
@@ -62,7 +62,7 @@ export default function ConfigPage() {
           )}
         </Card>
 
-        <Card title="🏫 Forms">
+        <Card title={<><i className="fas fa-school mr-1.5" />Forms</>}>
           {FORMS.map(f => (
             <div key={f} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
               <span style={{ color: 'hsl(var(--text2))' }}>{f}</span>
@@ -70,7 +70,7 @@ export default function ConfigPage() {
           ))}
         </Card>
 
-        <Card title="👩‍🏫 User Roles">
+        <Card title={<><i className="fas fa-user-shield mr-1.5" />User Roles</>}>
           <div className="text-xs" style={{ color: 'hsl(var(--text2))' }}>
             <div className="mb-1">Admin, Teacher, Student, Parent, HOD, HOY</div>
             <div className="text-[10px]" style={{ color: 'hsl(var(--text3))' }}>Assign HOD/HOY roles using the cards above. Teacher and Student roles are auto-assigned during onboarding.</div>

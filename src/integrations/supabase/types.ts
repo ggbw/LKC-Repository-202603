@@ -248,6 +248,36 @@ export type Database = {
           },
         ]
       }
+      exams: {
+        Row: {
+          created_at: string | null
+          end_date: string | null
+          form: string
+          id: string
+          name: string
+          start_date: string | null
+          state: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          end_date?: string | null
+          form?: string
+          id?: string
+          name: string
+          start_date?: string | null
+          state?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string | null
+          form?: string
+          id?: string
+          name?: string
+          start_date?: string | null
+          state?: string | null
+        }
+        Relationships: []
+      }
       hod_assignments: {
         Row: {
           department: string
@@ -392,6 +422,39 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      student_subjects: {
+        Row: {
+          id: string
+          student_id: string
+          subject_id: string
+        }
+        Insert: {
+          id?: string
+          student_id: string
+          subject_id: string
+        }
+        Update: {
+          id?: string
+          student_id?: string
+          subject_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_subjects_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_subjects_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       students: {
         Row: {

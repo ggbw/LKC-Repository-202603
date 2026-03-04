@@ -14,67 +14,67 @@ function navItems(roles: AppRole[]): NavItem[] {
   const items: NavItem[] = [];
 
   if (isAdmin || isHOD || isHOY) {
-    items.push({ sec: 'Main' }, { id: 'dashboard', ico: '🏠', label: 'Dashboard' });
+    items.push({ sec: 'Main' }, { id: 'dashboard', ico: 'fas fa-tachometer-alt', label: 'Dashboard' });
   }
 
   if (isStudent) {
     items.push({ sec: 'My School' });
-    items.push({ id: 'assignments', ico: '📝', label: 'My Assignments' });
-    items.push({ id: 'results', ico: '📊', label: 'My Results' });
-    items.push({ id: 'attendance', ico: '✅', label: 'My Attendance' });
+    items.push({ id: 'assignments', ico: 'fas fa-tasks', label: 'My Assignments' });
+    items.push({ id: 'results', ico: 'fas fa-chart-bar', label: 'My Results' });
+    items.push({ id: 'attendance', ico: 'fas fa-calendar-check', label: 'My Attendance' });
   }
 
   if (isParent && !isAdmin) {
     items.push({ sec: 'My Children' });
-    items.push({ id: 'students', ico: '🎓', label: 'My Children' });
-    items.push({ id: 'results', ico: '📊', label: 'Exam Results' });
+    items.push({ id: 'students', ico: 'fas fa-graduation-cap', label: 'My Children' });
+    items.push({ id: 'results', ico: 'fas fa-chart-bar', label: 'Exam Results' });
   }
 
   if (isTeacher) {
     items.push({ sec: 'Academic' });
-    items.push({ id: 'assignments', ico: '📝', label: 'Assignments' });
-    items.push({ id: 'attendance', ico: '✅', label: 'Attendance' });
-    items.push({ id: 'results', ico: '📊', label: 'Exam Results' });
+    items.push({ id: 'assignments', ico: 'fas fa-tasks', label: 'Assignments' });
+    items.push({ id: 'attendance', ico: 'fas fa-calendar-check', label: 'Attendance' });
+    items.push({ id: 'results', ico: 'fas fa-chart-bar', label: 'Exam Results' });
   }
 
   if (isHOD) {
     items.push({ sec: 'HOD' });
-    items.push({ id: 'hod', ico: '📈', label: 'HOD Report' });
-    items.push({ id: 'exams', ico: '📋', label: 'Examinations' });
+    items.push({ id: 'hod', ico: 'fas fa-chart-line', label: 'HOD Report' });
+    items.push({ id: 'exams', ico: 'fas fa-clipboard-list', label: 'Examinations' });
   }
 
   if (isHOY) {
     items.push({ sec: 'HOY' });
-    items.push({ id: 'hoy', ico: '📊', label: 'HOY Report' });
+    items.push({ id: 'hoy', ico: 'fas fa-chart-pie', label: 'HOY Report' });
   }
 
   if (isAdmin) {
     items.push({ sec: 'People' });
-    items.push({ id: 'students', ico: '🎓', label: 'Students' });
-    items.push({ id: 'faculty', ico: '👩‍🏫', label: 'Teachers' });
-    items.push({ id: 'parents', ico: '👪', label: 'Parents' });
+    items.push({ id: 'students', ico: 'fas fa-graduation-cap', label: 'Students' });
+    items.push({ id: 'faculty', ico: 'fas fa-chalkboard-teacher', label: 'Teachers' });
+    items.push({ id: 'parents', ico: 'fas fa-users', label: 'Parents' });
     items.push({ sec: 'Academic' });
-    items.push({ id: 'assignments', ico: '📝', label: 'Assignments' });
-    items.push({ id: 'exams', ico: '📋', label: 'Examinations' });
-    items.push({ id: 'results', ico: '📊', label: 'Exam Results' });
-    items.push({ id: 'attendance', ico: '✅', label: 'Attendance' });
+    items.push({ id: 'assignments', ico: 'fas fa-tasks', label: 'Assignments' });
+    items.push({ id: 'exams', ico: 'fas fa-clipboard-list', label: 'Examinations' });
+    items.push({ id: 'results', ico: 'fas fa-chart-bar', label: 'Exam Results' });
+    items.push({ id: 'attendance', ico: 'fas fa-calendar-check', label: 'Attendance' });
     items.push({ sec: 'Reports' });
-    items.push({ id: 'hod', ico: '📈', label: 'HOD Analysis' });
-    items.push({ id: 'hoy', ico: '📊', label: 'HOY Analysis' });
+    items.push({ id: 'hod', ico: 'fas fa-chart-line', label: 'HOD Analysis' });
+    items.push({ id: 'hoy', ico: 'fas fa-chart-pie', label: 'HOY Analysis' });
     items.push({ sec: 'Admin' });
-    items.push({ id: 'admission', ico: '📋', label: 'Admissions' });
-    items.push({ id: 'users', ico: '👤', label: 'User Management' });
-    items.push({ id: 'config', ico: '⚙️', label: 'Configuration' });
+    items.push({ id: 'admission', ico: 'fas fa-file-alt', label: 'Admissions' });
+    items.push({ id: 'users', ico: 'fas fa-user-cog', label: 'User Management' });
+    items.push({ id: 'config', ico: 'fas fa-cogs', label: 'Configuration' });
   }
 
   items.push({ sec: 'Info' });
-  items.push({ id: 'announcements', ico: '📢', label: 'Announcements' });
+  items.push({ id: 'announcements', ico: 'fas fa-bullhorn', label: 'Announcements' });
 
   return items;
 }
 
 const roleBg: Record<string, string> = {
-  admin: 'linear-gradient(135deg,#2ea043,#238636)',
+  admin: 'linear-gradient(135deg,#1a3fa0,#153285)',
   teacher: 'linear-gradient(135deg,#1f6feb,#0969da)',
   student: 'linear-gradient(135deg,#8250df,#6e40c9)',
   parent: 'linear-gradient(135deg,#bc4c00,#9a6700)',
@@ -82,7 +82,8 @@ const roleBg: Record<string, string> = {
   hoy: 'linear-gradient(135deg,#1f6feb,#0969da)',
 };
 const roleIcon: Record<string, string> = {
-  admin: '👑', teacher: '👩‍🏫', student: '🎓', parent: '👪', hod: '📈', hoy: '📊',
+  admin: 'fas fa-crown', teacher: 'fas fa-chalkboard-teacher', student: 'fas fa-graduation-cap',
+  parent: 'fas fa-users', hod: 'fas fa-chart-line', hoy: 'fas fa-chart-pie',
 };
 
 export default function Sidebar() {
@@ -117,14 +118,14 @@ export default function Sidebar() {
             <div key={i} onClick={() => setPage(item.id!)}
               className="flex items-center gap-2.5 py-2 px-4 cursor-pointer text-[12.5px] select-none transition-all"
               style={{
-                borderLeft: `3px solid ${page === item.id ? '#2ea043' : 'transparent'}`,
+                borderLeft: `3px solid ${page === item.id ? '#1a3fa0' : 'transparent'}`,
                 background: page === item.id ? '#21262d' : 'transparent',
                 color: page === item.id ? '#e6edf3' : '#8b949e',
                 fontWeight: page === item.id ? 500 : 400,
               }}
               onMouseEnter={e => { if (page !== item.id) { (e.currentTarget as HTMLElement).style.background = '#161b22'; (e.currentTarget as HTMLElement).style.color = '#c9d1d9'; }}}
               onMouseLeave={e => { if (page !== item.id) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#8b949e'; }}}>
-              <span className="text-sm w-4 text-center flex-shrink-0">{item.ico}</span>
+              <i className={`${item.ico} text-[12px] w-4 text-center flex-shrink-0`} />
               {item.label}
             </div>
           );
@@ -135,7 +136,7 @@ export default function Sidebar() {
         <div className="flex items-center gap-2 mb-2">
           <div className="w-7 h-7 rounded-[7px] flex items-center justify-center text-[11px] font-bold flex-shrink-0"
             style={{ background: roleBg[primaryRole] || roleBg.student, color: '#fff' }}>
-            {roleIcon[primaryRole] || '👤'}
+            <i className={roleIcon[primaryRole] || 'fas fa-user'} style={{ fontSize: '11px' }} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-semibold truncate" style={{ color: '#c9d1d9' }}>{profile?.full_name || 'User'}</div>
@@ -143,7 +144,9 @@ export default function Sidebar() {
           </div>
         </div>
         <button onClick={signOut} className="w-full text-[10px] font-semibold py-1.5 rounded cursor-pointer border-none"
-          style={{ background: '#21262d', color: '#8b949e' }}>Sign Out</button>
+          style={{ background: '#21262d', color: '#8b949e' }}>
+          <i className="fas fa-sign-out-alt mr-1" /> Sign Out
+        </button>
       </div>
     </div>
   );

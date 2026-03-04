@@ -1,3 +1,4 @@
+@import '@fortawesome/fontawesome-free/css/all.min.css';
 @import '@fontsource/sora/300.css';
 @import '@fontsource/sora/400.css';
 @import '@fontsource/sora/500.css';
@@ -20,7 +21,7 @@
     --sidebar-active: 215 14% 15%;
     --accent-green: 136 55% 40%;
     --accent-green-fg: 0 0% 100%;
-    --accent-blue: 215 89% 52%;
+    --accent-blue: 223 72% 36%;
     --accent-blue-fg: 0 0% 100%;
     --accent-yellow: 42 79% 57%;
     --accent-purple: 264 55% 59%;
@@ -38,7 +39,7 @@
 
     --card: 0 0% 100%;
     --card-foreground: 213 14% 15%;
-    --primary: 136 55% 40%;
+    --primary: 223 72% 36%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 25% 98%;
     --secondary-foreground: 213 14% 15%;
@@ -55,7 +56,7 @@
 
     --sidebar-background: 216 28% 7%;
     --sidebar-foreground: 213 7% 57%;
-    --sidebar-primary: 136 55% 40%;
+    --sidebar-primary: 223 72% 36%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 215 14% 15%;
     --sidebar-accent-foreground: 210 25% 92%;

@@ -34,8 +34,8 @@ export default function ResultsPage() {
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold">Exam Results</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{results.length} total results</div></div>
-        <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+        <div><div className="text-lg font-bold"><i className="fas fa-chart-bar mr-2" />Exam Results</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{results.length} total results</div></div>
+        <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
       </div>
       <Card>
         <SearchBar value={search} onChange={setSearch} placeholder="🔍  Search student...">

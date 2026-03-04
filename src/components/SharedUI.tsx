@@ -11,9 +11,12 @@ export function Badge({ status }: { status: string }) {
 export function StatCard({ icon, bg, value, label, sub, subColor }: {
   icon: string; bg: string; value: string | number; label: string; sub?: string; subColor?: string;
 }) {
+  const isFa = icon.startsWith('fa');
   return (
     <div className="flex items-center gap-3.5 p-4 rounded-lg border" style={{ background: 'hsl(var(--surface))', borderColor: 'hsl(var(--border))', boxShadow: 'var(--shadow)' }}>
-      <div className="w-11 h-11 rounded-[10px] flex items-center justify-center text-xl flex-shrink-0" style={{ background: bg }}>{icon}</div>
+      <div className="w-11 h-11 rounded-[10px] flex items-center justify-center text-xl flex-shrink-0" style={{ background: bg }}>
+        {isFa ? <i className={icon} style={{ fontSize: '18px' }} /> : icon}
+      </div>
       <div>
         <div className="text-2xl font-bold leading-none font-mono">{value}</div>
         <div className="text-[11px] mt-0.5" style={{ color: 'hsl(var(--text2))' }}>{label}</div>
@@ -25,7 +28,7 @@ export function StatCard({ icon, bg, value, label, sub, subColor }: {
 
 // Card wrapper
 export function Card({ children, title, titleRight, className = '', style }: {
-  children: React.ReactNode; title?: string; titleRight?: React.ReactNode; className?: string; style?: React.CSSProperties;
+  children: React.ReactNode; title?: React.ReactNode; titleRight?: React.ReactNode; className?: string; style?: React.CSSProperties;
 }) {
   return (
     <div className={`rounded-lg border p-5 ${className}`} style={{ background: 'hsl(var(--surface))', borderColor: 'hsl(var(--border))', boxShadow: 'var(--shadow)', ...style }}>
@@ -121,8 +124,8 @@ export function Btn({ children, variant = 'primary', size = 'md', onClick, disab
   const base = 'border-none rounded-md font-semibold cursor-pointer font-sans transition-all inline-flex items-center gap-1.5';
   const sz = size === 'sm' ? 'py-1 px-2.5 text-[11px]' : 'py-[7px] px-3.5 text-xs';
   const vars: Record<string, string> = {
-    primary: 'bg-[#2ea043] text-white hover:bg-[#238636]',
-    blue: 'bg-[#1f6feb] text-white hover:bg-[#1158c7]',
+    primary: 'bg-[#1a3fa0] text-white hover:bg-[#153285]',
+    blue: 'bg-[#1a3fa0] text-white hover:bg-[#153285]',
     purple: 'bg-[#8250df] text-white hover:bg-[#6e40c9]',
     danger: 'bg-[#f85149] text-white hover:bg-[#d1302f]',
     outline: 'bg-transparent border border-solid text-[hsl(var(--text2))] hover:bg-[hsl(var(--surface2))]',
