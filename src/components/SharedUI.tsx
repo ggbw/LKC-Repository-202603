@@ -116,7 +116,7 @@ export function BackBtn({ onClick, label }: { onClick: () => void; label: string
 // Btn components
 export function Btn({ children, variant = 'primary', size = 'md', onClick, disabled, className = '', style }: {
   children: React.ReactNode; variant?: 'primary' | 'blue' | 'purple' | 'outline' | 'danger';
-  size?: 'sm' | 'md'; onClick?: () => void; disabled?: boolean; className?: string; style?: React.CSSProperties;
+  size?: 'sm' | 'md'; onClick?: (e?: any) => void; disabled?: boolean; className?: string; style?: React.CSSProperties;
 }) {
   const base = 'border-none rounded-md font-semibold cursor-pointer font-sans transition-all inline-flex items-center gap-1.5';
   const sz = size === 'sm' ? 'py-1 px-2.5 text-[11px]' : 'py-[7px] px-3.5 text-xs';

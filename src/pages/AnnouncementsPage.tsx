@@ -5,6 +5,7 @@ import { useApp } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, Badge, Btn, Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
 import { formatDate } from '@/data/database';
+import { downloadExcel } from '@/lib/excel';
 
 export default function AnnouncementsPage() {
   const { data: announcements = [], isLoading } = useAnnouncements();
@@ -13,13 +14,24 @@ export default function AnnouncementsPage() {
   const [modal, setModal] = useState(false);
   const invalidate = useInvalidate();
 
+  const handleExport = () => {
+    downloadExcel(announcements.map((a: any) => ({
+      'Title': a.title, 'Content': a.content || '', 'Type': a.type || '',
+      'Created': a.created_at?.split('T')[0] || '', 'Event Date': a.event_date || '',
+    })), 'announcements_export', 'Announcements');
+    showToast('Exported');
+  };
+
   if (isLoading) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Loading...</div></div>;
 
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
         <div><div className="text-lg font-bold">Announcements & Events</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{announcements.length} total</div></div>
-        {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}>＋ New Announcement</Btn>}
+        <div className="flex gap-2">
+          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+          {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}>＋ New Announcement</Btn>}
+        </div>
       </div>
 
       {announcements.length === 0 ? (
@@ -30,7 +42,17 @@ export default function AnnouncementsPage() {
             <Card key={a.id}>
               <div className="flex justify-between items-start mb-2">
                 <div className="font-bold text-sm">{a.title}</div>
-                <Badge status={a.type || 'announcement'} />
+                <div className="flex gap-2 items-center">
+                  <Badge status={a.type || 'announcement'} />
+                  {isAdmin && (
+                    <Btn variant="danger" size="sm" onClick={async () => {
+                      if (!confirm('Delete?')) return;
+                      await supabase.from('announcements').delete().eq('id', a.id);
+                      invalidate(['announcements']);
+                      showToast('Deleted');
+                    }}>🗑</Btn>
+                  )}
+                </div>
               </div>
               <div className="text-[12.5px] mb-2" style={{ color: 'hsl(var(--text2))' }}>{a.content}</div>
               <div className="flex gap-3 text-[10px]" style={{ color: 'hsl(var(--text3))' }}>

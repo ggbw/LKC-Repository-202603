@@ -20,6 +20,7 @@ import HODReportPage from '@/pages/HODReportPage';
 import HOYReportPage from '@/pages/HOYReportPage';
 import AnnouncementsPage from '@/pages/AnnouncementsPage';
 import ConfigPage from '@/pages/ConfigPage';
+import UserManagementPage from '@/pages/UserManagementPage';
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ function AppInner() {
     hoy: <HOYReportPage />,
     announcements: <AnnouncementsPage />,
     config: <ConfigPage />,
+    users: <UserManagementPage />,
   };
 
   return (

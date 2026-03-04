@@ -4,7 +4,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import { FORMS, cap } from '@/data/database';
-import { Badge, Card, Btn, FilterSelect, StatCard } from '@/components/SharedUI';
+import { downloadExcel } from '@/lib/excel';
+import { Badge, Card, Btn, FilterSelect } from '@/components/SharedUI';
 
 export default function AttendancePage() {
   const todayStr = new Date().toISOString().split('T')[0];
@@ -21,7 +22,6 @@ export default function AttendancePage() {
   const absent = attendance.filter((a: any) => a.status === 'absent').length;
   const late = attendance.filter((a: any) => a.status === 'late').length;
 
-  // Mark attendance state
   const [attendanceMarks, setAttendanceMarks] = useState<Record<string, string>>({});
 
   const startMarking = () => {
@@ -36,27 +36,34 @@ export default function AttendancePage() {
     const records = Object.entries(attendanceMarks).map(([sid, status]) => ({
       student_id: sid, date, status,
     }));
-    const { error } = await supabase.from('attendance').upsert(records, { onConflict: 'student_id,date' });
-    if (error) {
-      // If upsert fails due to missing constraint, try insert
-      const { error: err2 } = await supabase.from('attendance').insert(records);
-      if (err2) { showToast(err2.message, 'error'); return; }
-    }
+    const { error } = await supabase.from('attendance').insert(records);
+    if (error) { showToast(error.message, 'error'); return; }
     showToast(`Attendance saved for ${records.length} students`);
     setMarking(false);
     invalidate(['attendance']);
+  };
+
+  const handleExport = () => {
+    downloadExcel(attendance.map((a: any) => ({
+      'Student': a.students?.full_name || '', 'Form': a.students?.form || '',
+      'Date': a.date, 'Status': cap(a.status),
+    })), `attendance_${date}`, 'Attendance');
+    showToast('Attendance exported');
   };
 
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
         <div className="text-lg font-bold">Attendance — {date}</div>
-        {(isTeacher || isAdmin) && !marking && (
-          <div className="flex gap-2 items-center">
-            <FilterSelect value={markingForm} onChange={setMarkingForm} allLabel="Select Form" options={FORMS.map(f => ({ value: f, label: f }))} />
-            <Btn onClick={startMarking} disabled={!markingForm}>＋ Mark Attendance</Btn>
-          </div>
-        )}
+        <div className="flex gap-2 items-center">
+          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+          {(isTeacher || isAdmin) && !marking && (
+            <>
+              <FilterSelect value={markingForm} onChange={setMarkingForm} allLabel="Select Form" options={FORMS.map(f => ({ value: f, label: f }))} />
+              <Btn onClick={startMarking} disabled={!markingForm}>＋ Mark Attendance</Btn>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-2.5 mb-4">
