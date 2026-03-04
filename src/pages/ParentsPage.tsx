@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { useParents, useParentStudents } from '@/hooks/useSupabaseData';
+import { useAuth } from '@/context/AuthContext';
+import { useParents, useParentStudents, useInvalidate } from '@/hooks/useSupabaseData';
+import { supabase } from '@/integrations/supabase/client';
 import { cap } from '@/data/database';
-import { Badge, Card, InfoRow, SearchBar, BackBtn, Btn } from '@/components/SharedUI';
+import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
+import { Badge, Card, InfoRow, SearchBar, BackBtn, Btn,
+  Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
 
 export default function ParentsPage() {
-  const { detail, setDetail, setPage } = useApp();
+  const { detail, setDetail, setPage, showToast } = useApp();
+  const { isAdmin } = useAuth();
   const { data: parents = [], isLoading } = useParents();
   const { data: parentStudents = [] } = useParentStudents();
+  const invalidate = useInvalidate();
   const [search, setSearch] = useState('');
+  const [modal, setModal] = useState<string | 'new' | null>(null);
 
   if (detail) {
     const p = parents.find((x: any) => x.id === detail) as any;
@@ -47,17 +54,54 @@ export default function ParentsPage() {
 
   const rows = parents.filter((p: any) => !search || p.name.toLowerCase().includes(search.toLowerCase()));
 
+  const handleExport = () => {
+    downloadExcel(rows.map((p: any) => ({
+      'Name': p.name, 'Relation': cap(p.relation || ''),
+      'Phone': p.phone || '', 'Email': p.email || '',
+      'Children': parentStudents.filter((ps: any) => ps.parent_id === p.id).length,
+    })), 'parents_export', 'Parents');
+    showToast('Parents exported');
+  };
+
+  const handleImport = async () => {
+    const file = await triggerFileUpload();
+    if (!file) return;
+    try {
+      const data = await parseExcel(file);
+      let count = 0;
+      for (const row of data) {
+        const name = row['Name'] || row['name'];
+        if (!name) continue;
+        const { error } = await supabase.from('parents').insert({
+          name, relation: row['Relation'] || row['relation'] || null,
+          phone: row['Phone'] || row['phone'] || null,
+          email: row['Email'] || row['email'] || null,
+        });
+        if (!error) count++;
+      }
+      showToast(`Imported ${count} parents`);
+      invalidate(['parents']);
+    } catch (e: any) { showToast(e.message, 'error'); }
+  };
+
   if (isLoading) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Loading...</div></div>;
 
   return (
     <div className="page-animate">
-      <div className="mb-4"><div className="text-lg font-bold">Parents</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{parents.length} total</div></div>
+      <div className="flex justify-between items-center mb-4">
+        <div><div className="text-lg font-bold">Parents</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{parents.length} total</div></div>
+        <div className="flex gap-2">
+          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+          {isAdmin && <Btn variant="outline" onClick={handleImport}>⬆ Import</Btn>}
+          {isAdmin && <Btn onClick={() => setModal('new')}>＋ New Parent</Btn>}
+        </div>
+      </div>
       <Card>
         <SearchBar value={search} onChange={setSearch} placeholder="🔍  Search..." />
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
             <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Name','Relation','Phone','Email','Children'].map(h => (
+              {['Name','Relation','Phone','Email','Children', ...(isAdmin ? ['Actions'] : [])].map(h => (
                 <th key={h} className={`py-[9px] px-3.5 text-[10px] font-semibold uppercase tracking-wide ${h === 'Children' ? 'text-center' : 'text-left'}`} style={{ color: 'hsl(var(--text2))' }}>{h}</th>
               ))}
             </tr></thead>
@@ -71,6 +115,20 @@ export default function ParentsPage() {
                     <td className="py-2.5 px-3.5 text-[11px]">{p.phone || '—'}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">{p.email || '—'}</td>
                     <td className="py-2.5 px-3.5 text-center font-bold font-mono">{cnt}</td>
+                    {isAdmin && (
+                      <td className="py-2.5 px-3.5">
+                        <div className="flex gap-1">
+                          <Btn variant="outline" size="sm" onClick={(e: any) => { e.stopPropagation(); setModal(p.id); }}>✏️</Btn>
+                          <Btn variant="danger" size="sm" onClick={async (e: any) => {
+                            e.stopPropagation();
+                            if (!confirm('Delete this parent?')) return;
+                            await supabase.from('parents').delete().eq('id', p.id);
+                            invalidate(['parents']);
+                            showToast('Parent deleted');
+                          }}>🗑</Btn>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -78,6 +136,52 @@ export default function ParentsPage() {
           </table>
         </div>
       </Card>
+      {modal !== null && <ParentModal id={modal === 'new' ? null : modal} parents={parents} onClose={() => { setModal(null); invalidate(['parents']); }} />}
     </div>
+  );
+}
+
+function ParentModal({ id, parents, onClose }: { id: string | null; parents: any[]; onClose: () => void }) {
+  const { showToast } = useApp();
+  const existing = id ? parents.find((p: any) => p.id === id) : null;
+  const [name, setName] = useState(existing?.name || '');
+  const [relation, setRelation] = useState(existing?.relation || 'father');
+  const [phone, setPhone] = useState(existing?.phone || '');
+  const [email, setEmail] = useState(existing?.email || '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    if (id) {
+      const { error } = await supabase.from('parents').update({ name, relation, phone: phone || null, email: email || null }).eq('id', id);
+      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+      showToast('Parent updated');
+    } else {
+      const { error } = await supabase.from('parents').insert({ name, relation, phone: phone || null, email: email || null });
+      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+      showToast(`Parent "${name}" created`);
+    }
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHead title={id ? '✏️ Edit Parent' : '➕ Add Parent'} onClose={onClose} />
+      <ModalBody>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Name" required><FieldInput value={name} onChange={setName} /></Field>
+          <Field label="Relation"><FieldSelect value={relation} onChange={setRelation} options={['father','mother','guardian','grandparent','other'].map(r => ({ value: r, label: cap(r) }))} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Phone"><FieldInput value={phone} onChange={setPhone} /></Field>
+          <Field label="Email"><FieldInput value={email} onChange={setEmail} type="email" /></Field>
+        </div>
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : id ? 'Update' : 'Create'}</Btn>
+      </ModalFoot>
+    </Modal>
   );
 }

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { useAssignments, useSubmissions, useStudents, useSubjects, useTeachers, useInvalidate } from '@/hooks/useSupabaseData';
+import { useAssignments, useSubmissions, useSubjects, useTeachers, useInvalidate } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import { FORMS, cap, formatDate, formatDateTime } from '@/data/database';
+import { downloadExcel } from '@/lib/excel';
 import { Badge, Card, StatCard, SearchBar, Btn, BackBtn,
-  Modal, ModalHead, ModalBody, ModalFoot, FormSection, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
+  Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
 
 export default function AssignmentsPage() {
   const { detail, setDetail, showToast } = useApp();
-  const { isAdmin, isTeacher, isStudent } = useAuth();
+  const { isAdmin, isTeacher } = useAuth();
   const { data: assignments = [], isLoading } = useAssignments();
   const { data: submissions = [] } = useSubmissions();
   const { data: subjects = [] } = useSubjects();
@@ -19,6 +20,15 @@ export default function AssignmentsPage() {
 
   if (detail) return <AssignmentDetail id={detail} onBack={() => setDetail(null)} />;
 
+  const handleExport = () => {
+    downloadExcel(assignments.map((a: any) => ({
+      'Title': a.title, 'Subject': a.subjects?.name || '', 'Form': a.form,
+      'Due Date': a.due_date || '', 'Status': cap(a.state || 'draft'),
+      'Total Marks': a.total_marks || '',
+    })), 'assignments_export', 'Assignments');
+    showToast('Exported');
+  };
+
   if (isLoading) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Loading...</div></div>;
 
   const pubCount = assignments.filter((a: any) => a.state === 'published').length;
@@ -27,7 +37,10 @@ export default function AssignmentsPage() {
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
         <div><div className="text-lg font-bold">Assignments</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{assignments.length} total</div></div>
-        {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}>＋ Create Assignment</Btn>}
+        <div className="flex gap-2">
+          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+          {(isAdmin || isTeacher) && <Btn onClick={() => setModal(true)}>＋ Create Assignment</Btn>}
+        </div>
       </div>
 
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))' }}>
@@ -40,7 +53,7 @@ export default function AssignmentsPage() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
             <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Title','Subject','Form','Due Date','Status','Submissions'].map(h => (
+              {['Title','Subject','Form','Due Date','Status','Submissions', ...(isAdmin ? ['Actions'] : [])].map(h => (
                 <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
               ))}
             </tr></thead>
@@ -56,6 +69,17 @@ export default function AssignmentsPage() {
                     <td className="py-2.5 px-3.5 font-mono text-[11px]">{formatDate(a.due_date)}</td>
                     <td className="py-2.5 px-3.5"><Badge status={a.state || 'draft'} /></td>
                     <td className="py-2.5 px-3.5 font-mono text-center">{subs.length}</td>
+                    {isAdmin && (
+                      <td className="py-2.5 px-3.5">
+                        <Btn variant="danger" size="sm" onClick={async (e: any) => {
+                          e.stopPropagation();
+                          if (!confirm('Delete?')) return;
+                          await supabase.from('assignments').delete().eq('id', a.id);
+                          invalidate(['assignments']);
+                          showToast('Deleted');
+                        }}>🗑</Btn>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -137,7 +161,6 @@ function AssignmentModal({ subjects, teachers, onClose }: { subjects: any[]; tea
   const save = async () => {
     if (!title.trim()) return;
     setSaving(true);
-    // Find teacher id for current user
     const teacher = teachers.find((t: any) => t.user_id === user?.id);
     const { error } = await supabase.from('assignments').insert({
       title, form, subject_id: subjectId || null, description: desc,

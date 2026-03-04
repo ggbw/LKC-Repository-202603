@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { useStudents, useInvalidate } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
-import { FORMS, cap, formatDate, G, P } from '@/data/database';
+import { FORMS, cap, formatDate } from '@/data/database';
+import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
 import { Badge, Card, InfoRow, SearchBar, FilterSelect, Btn, BackBtn,
   Modal, ModalHead, ModalBody, ModalFoot, FormSection, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
 
 export default function StudentsPage() {
   const { detail, setDetail, showToast } = useApp();
+  const { isAdmin } = useAuth();
   const { data: students = [], isLoading } = useStudents();
   const [search, setSearch] = useState('');
   const [filterForm, setFilterForm] = useState('');
@@ -23,13 +26,53 @@ export default function StudentsPage() {
     (!filterState || s.state === filterState)
   );
 
+  const handleExport = () => {
+    downloadExcel(rows.map((s: any) => ({
+      'Enrollment': s.enrollment_number || '', 'Full Name': s.full_name, 'Form': s.form,
+      'Gender': cap(s.gender || ''), 'Status': cap(s.state || 'active'),
+      'Date of Birth': s.date_of_birth || '', 'Nationality': s.nationality || '',
+      'Email': s.email || '', 'Admission Date': s.admission_date || '',
+    })), 'students_export', 'Students');
+    showToast('Students exported');
+  };
+
+  const handleImport = async () => {
+    const file = await triggerFileUpload();
+    if (!file) return;
+    try {
+      const data = await parseExcel(file);
+      let count = 0;
+      for (const row of data) {
+        const name = row['Full Name'] || row['full_name'] || row['Name'] || row['name'];
+        const form = row['Form'] || row['form'] || 'Form 1';
+        if (!name) continue;
+        const { error } = await supabase.from('students').insert({
+          full_name: name, form,
+          gender: row['Gender'] || row['gender'] || null,
+          enrollment_number: row['Enrollment'] || row['enrollment_number'] || null,
+          email: row['Email'] || row['email'] || null,
+          nationality: row['Nationality'] || row['nationality'] || null,
+          date_of_birth: row['Date of Birth'] || row['date_of_birth'] || null,
+          state: 'active',
+        });
+        if (!error) count++;
+      }
+      showToast(`Imported ${count} students`);
+      invalidate(['students']);
+    } catch (e: any) { showToast(e.message, 'error'); }
+  };
+
   if (isLoading) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Loading students...</div></div>;
 
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
         <div><div className="text-lg font-bold">Students</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{students.length} total</div></div>
-        <Btn onClick={() => setModal('new')}>＋ New Student</Btn>
+        <div className="flex gap-2">
+          <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+          {isAdmin && <Btn variant="outline" onClick={handleImport}>⬆ Import</Btn>}
+          {isAdmin && <Btn onClick={() => setModal('new')}>＋ New Student</Btn>}
+        </div>
       </div>
       <Card>
         <SearchBar value={search} onChange={setSearch} placeholder="🔍  Search name or enrollment...">
@@ -40,7 +83,7 @@ export default function StudentsPage() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[12.5px]">
               <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-                {['Enrollment','Name','Form','Gender','Status'].map(h => (
+                {['Enrollment','Name','Form','Gender','Status', ...(isAdmin ? ['Actions'] : [])].map(h => (
                   <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
                 ))}
               </tr></thead>
@@ -52,6 +95,20 @@ export default function StudentsPage() {
                     <td className="py-2.5 px-3.5">{s.form}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">{cap(s.gender || '')}</td>
                     <td className="py-2.5 px-3.5"><Badge status={s.state || 'active'} /></td>
+                    {isAdmin && (
+                      <td className="py-2.5 px-3.5">
+                        <div className="flex gap-1">
+                          <Btn variant="outline" size="sm" onClick={(e: any) => { e.stopPropagation(); setModal(s.id); }}>✏️</Btn>
+                          <Btn variant="danger" size="sm" onClick={async (e: any) => {
+                            e.stopPropagation();
+                            if (!confirm('Delete this student?')) return;
+                            await supabase.from('students').delete().eq('id', s.id);
+                            invalidate(['students']);
+                            showToast('Student deleted');
+                          }}>🗑</Btn>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -60,7 +117,7 @@ export default function StudentsPage() {
           </div>
         )}
       </Card>
-      {modal !== null && <StudentModal id={modal === 'new' ? null : modal} onClose={() => { setModal(null); invalidate(['students']); }} />}
+      {modal !== null && <StudentModal id={modal === 'new' ? null : modal} students={students} onClose={() => { setModal(null); invalidate(['students']); }} />}
     </div>
   );
 }
@@ -99,36 +156,53 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
   );
 }
 
-function StudentModal({ id, onClose }: { id: string | null; onClose: () => void }) {
+function StudentModal({ id, students, onClose }: { id: string | null; students: any[]; onClose: () => void }) {
   const { showToast } = useApp();
-  const [name, setName] = useState('');
-  const [form, setForm] = useState('Form 1');
-  const [gender, setGender] = useState('male');
+  const existing = id ? students.find((s: any) => s.id === id) : null;
+  const [name, setName] = useState(existing?.full_name || '');
+  const [form, setForm] = useState(existing?.form || 'Form 1');
+  const [gender, setGender] = useState(existing?.gender || 'male');
+  const [enrollment, setEnrollment] = useState(existing?.enrollment_number || '');
+  const [email, setEmail] = useState(existing?.email || '');
+  const [state, setState] = useState(existing?.state || 'active');
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const { error } = await supabase.from('students').insert({ full_name: name, form, gender, state: 'active' });
-    if (error) { showToast(error.message, 'error'); setSaving(false); return; }
-    showToast(`Student "${name}" created`);
+    if (id) {
+      const { error } = await supabase.from('students').update({ full_name: name, form, gender, enrollment_number: enrollment || null, email: email || null, state }).eq('id', id);
+      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+      showToast('Student updated');
+    } else {
+      const { error } = await supabase.from('students').insert({ full_name: name, form, gender, enrollment_number: enrollment || null, email: email || null, state: 'active' });
+      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+      showToast(`Student "${name}" created`);
+    }
     onClose();
   };
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title="➕ Add Student" onClose={onClose} />
+      <ModalHead title={id ? '✏️ Edit Student' : '➕ Add Student'} onClose={onClose} />
       <ModalBody>
         <FormSection title="Basic Information" />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Full Name" required><FieldInput value={name} onChange={setName} /></Field>
           <Field label="Form" required><FieldSelect value={form} onChange={setForm} options={FORMS.map(f => ({ value: f, label: f }))} /></Field>
         </div>
-        <Field label="Gender"><FieldSelect value={gender} onChange={setGender} options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Gender"><FieldSelect value={gender} onChange={setGender} options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} /></Field>
+          <Field label="Enrollment #"><FieldInput value={enrollment} onChange={setEnrollment} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Email"><FieldInput value={email} onChange={setEmail} type="email" /></Field>
+          {id && <Field label="Status"><FieldSelect value={state} onChange={setState} options={['active','suspended','graduated','transferred','inactive'].map(s => ({ value: s, label: cap(s) }))} /></Field>}
+        </div>
       </ModalBody>
       <ModalFoot>
         <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Create'}</Btn>
+        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : id ? 'Update' : 'Create'}</Btn>
       </ModalFoot>
     </Modal>
   );

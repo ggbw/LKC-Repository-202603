@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import { useAuth } from '@/context/AuthContext';
 
 export type PageId = 'dashboard' | 'students' | 'faculty' | 'parents' | 'exams' | 'results' |
-  'attendance' | 'hod' | 'hoy' | 'config' | 'assignments' | 'announcements' | 'admission';
+  'attendance' | 'hod' | 'hoy' | 'config' | 'assignments' | 'announcements' | 'admission' | 'users';
 
 interface AppState {
   page: PageId;

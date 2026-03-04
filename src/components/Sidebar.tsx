@@ -63,6 +63,7 @@ function navItems(roles: AppRole[]): NavItem[] {
     items.push({ id: 'hoy', ico: '📊', label: 'HOY Analysis' });
     items.push({ sec: 'Admin' });
     items.push({ id: 'admission', ico: '📋', label: 'Admissions' });
+    items.push({ id: 'users', ico: '👤', label: 'User Management' });
     items.push({ id: 'config', ico: '⚙️', label: 'Configuration' });
   }
 

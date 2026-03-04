@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useExamResults, useInvalidate } from '@/hooks/useSupabaseData';
+import { useExamResults } from '@/hooks/useSupabaseData';
 import { useApp } from '@/context/AppContext';
-import { G, P } from '@/data/database';
-import { Badge, Card, SearchBar, FilterSelect, GradeChip } from '@/components/SharedUI';
+import { G, P, cap } from '@/data/database';
+import { downloadExcel } from '@/lib/excel';
+import { Badge, Card, SearchBar, FilterSelect, GradeChip, Btn } from '@/components/SharedUI';
 
 export default function ResultsPage() {
   const { data: results = [], isLoading } = useExamResults();
+  const { showToast } = useApp();
   const [search, setSearch] = useState('');
   const [examFilter, setExamFilter] = useState('');
 
@@ -15,11 +17,26 @@ export default function ResultsPage() {
     (!examFilter || r.exam_name === examFilter)
   );
 
+  const handleExport = () => {
+    downloadExcel(filt.map((r: any) => {
+      const p = P(Number(r.obtained_marks), Number(r.max_marks));
+      return {
+        'Student': r.students?.full_name || '', 'Subject': r.subjects?.name || '',
+        'Exam': r.exam_name, 'Obtained': r.obtained_marks, 'Max': r.max_marks,
+        '%': p, 'Grade': G(p), 'Status': cap(r.state || 'done'),
+      };
+    }), 'exam_results_export', 'Results');
+    showToast('Results exported');
+  };
+
   if (isLoading) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Loading...</div></div>;
 
   return (
     <div className="page-animate">
-      <div className="mb-4"><div className="text-lg font-bold">Exam Results</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{results.length} total results</div></div>
+      <div className="flex justify-between items-center mb-4">
+        <div><div className="text-lg font-bold">Exam Results</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{results.length} total results</div></div>
+        <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+      </div>
       <Card>
         <SearchBar value={search} onChange={setSearch} placeholder="🔍  Search student...">
           <FilterSelect value={examFilter} onChange={setExamFilter} allLabel="All Exams" options={exams.map(e => ({ value: e, label: e }))} />
