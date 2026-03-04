@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -13,7 +13,13 @@ import StudentsPage from '@/pages/StudentsPage';
 import ParentsPage from '@/pages/ParentsPage';
 import FacultyPage from '@/pages/FacultyPage';
 import AssignmentsPage from '@/pages/AssignmentsPage';
-import { ExamsPage, ResultsPage, AttendancePage, HODPage, ConfigPage } from '@/pages/OtherPages';
+import ExamsPage from '@/pages/ExamsPage';
+import ResultsPage from '@/pages/ResultsPage';
+import AttendancePage from '@/pages/AttendancePage';
+import HODReportPage from '@/pages/HODReportPage';
+import HOYReportPage from '@/pages/HOYReportPage';
+import AnnouncementsPage from '@/pages/AnnouncementsPage';
+import ConfigPage from '@/pages/ConfigPage';
 
 const queryClient = new QueryClient();
 
@@ -52,7 +58,9 @@ function AppInner() {
     exams: <ExamsPage />,
     results: <ResultsPage />,
     attendance: <AttendancePage />,
-    hod: <HODPage />,
+    hod: <HODReportPage />,
+    hoy: <HOYReportPage />,
+    announcements: <AnnouncementsPage />,
     config: <ConfigPage />,
   };
 
