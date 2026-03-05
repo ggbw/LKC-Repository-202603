@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { useStudents, useInvalidate } from '@/hooks/useSupabaseData';
+import { useStudents, useSubjectTeachers, useStudentSubjects, useClassTeachers, useInvalidate } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { FORMS, cap, formatDate } from '@/data/database';
 import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
@@ -94,7 +94,7 @@ export default function StudentsPage() {
                 {rows.slice(0, 100).map((s: any) => (
                   <tr key={s.id} className="hover:bg-[hsl(var(--surface2))] transition-colors" style={{ borderBottom: '1px solid #f6f8fa' }}>
                     <td className="py-2.5 px-3.5 font-mono text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{s.enrollment_number || '—'}</td>
-                    <td className="py-2.5 px-3.5 font-semibold cursor-pointer" style={{ color: '#1f6feb' }} onClick={() => setDetail(s.id)}>{s.full_name}</td>
+                    <td className="py-2.5 px-3.5 font-semibold cursor-pointer" style={{ color: '#1a3fa0' }} onClick={() => setDetail(s.id)}>{s.full_name}</td>
                     <td className="py-2.5 px-3.5">{s.form}</td>
                     <td className="py-2.5 px-3.5 text-[11px] font-mono">{s.class_name || '—'}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">{cap(s.gender || '')}</td>
@@ -102,14 +102,14 @@ export default function StudentsPage() {
                     {isAdmin && (
                       <td className="py-2.5 px-3.5">
                         <div className="flex gap-1">
-                          <Btn variant="outline" size="sm" onClick={(e: any) => { e.stopPropagation(); setModal(s.id); }}>✏️</Btn>
+                          <Btn variant="outline" size="sm" onClick={(e: any) => { e.stopPropagation(); setModal(s.id); }}><i className="fas fa-edit" /></Btn>
                           <Btn variant="danger" size="sm" onClick={async (e: any) => {
                             e.stopPropagation();
                             if (!confirm('Delete this student?')) return;
                             await supabase.from('students').delete().eq('id', s.id);
                             invalidate(['students']);
                             showToast('Student deleted');
-                          }}>🗑</Btn>
+                          }}><i className="fas fa-trash" /></Btn>
                         </div>
                       </td>
                     )}
@@ -128,33 +128,64 @@ export default function StudentsPage() {
 
 function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: students = [] } = useStudents();
+  const { data: studentSubjects = [] } = useStudentSubjects(id);
+  const { data: subjectTeachers = [] } = useSubjectTeachers();
+  const { data: classTeachers = [] } = useClassTeachers();
   const s = students.find((x: any) => x.id === id) as any;
   if (!s) return <><BackBtn onClick={onBack} label="Back" /><div>Not found</div></>;
+
+  const classTeacher = classTeachers.find((ct: any) => ct.form === s.form && ct.class_name === s.class_name);
 
   return (
     <div className="page-animate">
       <BackBtn onClick={onBack} label="Back to Students" />
       <div className="flex items-start gap-4 mb-5 pb-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-        <div className="w-[72px] h-[72px] rounded-[14px] flex items-center justify-center text-[32px] flex-shrink-0" style={{ background: 'hsl(var(--surface2))', border: '2px solid hsl(var(--border))' }}>{s.gender === 'female' ? '👩‍🎓' : '👨‍🎓'}</div>
+        <div className="w-[72px] h-[72px] rounded-[14px] flex items-center justify-center flex-shrink-0" style={{ background: 'hsl(var(--surface2))', border: '2px solid hsl(var(--border))' }}>
+          <i className={`fas fa-${s.gender === 'female' ? 'female' : 'male'}`} style={{ fontSize: '28px', color: '#1a3fa0' }} />
+        </div>
         <div>
           <div className="text-xl font-bold">{s.full_name}</div>
           <div className="flex gap-2 items-center flex-wrap mt-1.5">
             <Badge status={s.state || 'active'} />
             <span className="text-[11px] font-mono" style={{ color: 'hsl(var(--text2))' }}>{s.enrollment_number}</span>
-            <span className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{s.form}</span>
+            <span className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{s.form} {s.class_name || ''}</span>
           </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Card title="Personal Information">
+        <Card title={<><i className="fas fa-id-card mr-1.5" />Personal Information</>}>
           {[['Date of Birth', formatDate(s.date_of_birth)], ['Gender', cap(s.gender || '')], ['Form', s.form], ['Class', s.class_name || '—'], ['Enrollment', s.enrollment_number || '—'], ['Email', s.email || '—'], ['Nationality', s.nationality || '—'], ['Admission Date', formatDate(s.admission_date)]].map(([k, v]) => (
             <InfoRow key={k} label={k} value={v} />
           ))}
         </Card>
-        <Card title="Academic Info">
-          <InfoRow label="Academic Year" value={s.academic_year || '2026'} />
-          <InfoRow label="State" value={cap(s.state || 'active')} />
-        </Card>
+        <div>
+          <Card title={<><i className="fas fa-chalkboard-teacher mr-1.5" />Class Teacher</>} className="mb-4">
+            <div className="text-[12.5px]">
+              {classTeacher ? (
+                <span className="font-semibold">{classTeacher.teachers?.name}</span>
+              ) : (
+                <span style={{ color: 'hsl(var(--text3))' }}>Not assigned</span>
+              )}
+            </div>
+          </Card>
+          <Card title={<><i className="fas fa-book mr-1.5" />Subjects ({studentSubjects.length})</>}>
+            {studentSubjects.length === 0 ? (
+              <div className="text-xs" style={{ color: 'hsl(var(--text3))' }}>No subjects assigned</div>
+            ) : (
+              studentSubjects.map((ss: any) => {
+                const teacherMappings = subjectTeachers.filter((st: any) => st.subject_id === ss.subject_id);
+                return (
+                  <div key={ss.id} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
+                    <span className="font-semibold">{ss.subjects?.name} <span className="font-mono text-[9px]" style={{ color: 'hsl(var(--text3))' }}>{ss.subjects?.code}</span></span>
+                    <span className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>
+                      {teacherMappings.map((tm: any) => tm.teachers?.name).filter(Boolean).join(', ') || '—'}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -189,7 +220,7 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={id ? '✏️ Edit Student' : '➕ Add Student'} onClose={onClose} />
+      <ModalHead title={id ? 'Edit Student' : 'Add Student'} onClose={onClose} />
       <ModalBody>
         <FormSection title="Basic Information" />
         <div className="grid grid-cols-2 gap-3">

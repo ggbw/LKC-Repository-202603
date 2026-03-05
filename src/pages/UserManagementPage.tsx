@@ -16,7 +16,7 @@ export default function UserManagementPage() {
   const invalidate = useInvalidate();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
-  const [credentialsModal, setCredentialsModal] = useState(false);
+  const [resetModal, setResetModal] = useState<any>(null);
   const [newUsers, setNewUsers] = useState<{ email: string; password: string; name: string; role: string }[]>([]);
 
   if (!isAdmin) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Access denied</div></div>;
@@ -28,26 +28,15 @@ export default function UserManagementPage() {
   );
 
   const downloadCredentials = () => {
-    if (newUsers.length === 0) {
-      showToast('No new credentials to download', 'info');
-      return;
-    }
-    downloadCSV(newUsers.map(u => ({
-      Name: u.name,
-      Email: u.email,
-      Password: u.password,
-      Role: u.role,
-    })), 'lkc_user_credentials');
+    if (newUsers.length === 0) { showToast('No new credentials to download', 'info'); return; }
+    downloadCSV(newUsers.map(u => ({ Name: u.name, Email: u.email, Password: u.password, Role: u.role })), 'lkc_user_credentials');
     showToast('Credentials downloaded');
   };
 
   const downloadAllUsers = () => {
     const data = profiles.map((p: any) => ({
-      Name: p.full_name,
-      Email: p.email,
-      Roles: getRoles(p.user_id).join(', '),
-      'Must Change Password': p.must_change_password ? 'Yes' : 'No',
-      'Created At': p.created_at,
+      Name: p.full_name, Email: p.email, Roles: getRoles(p.user_id).join(', '),
+      'Must Change Password': p.must_change_password ? 'Yes' : 'No', 'Created At': p.created_at,
     }));
     downloadExcel(data, 'lkc_all_users', 'Users');
     showToast('Users exported');
@@ -58,11 +47,11 @@ export default function UserManagementPage() {
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold">User Management</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{profiles.length} users</div></div>
+        <div><div className="text-lg font-bold"><i className="fas fa-user-cog mr-2" />User Management</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{profiles.length} users</div></div>
         <div className="flex gap-2">
-          <Btn variant="outline" onClick={downloadAllUsers}>⬇ Export Users</Btn>
-          {newUsers.length > 0 && <Btn variant="purple" onClick={downloadCredentials}>🔑 Download Credentials ({newUsers.length})</Btn>}
-          <Btn onClick={() => setModal(true)}>＋ Create User</Btn>
+          <Btn variant="outline" onClick={downloadAllUsers}><i className="fas fa-download mr-1" />Export Users</Btn>
+          {newUsers.length > 0 && <Btn variant="purple" onClick={downloadCredentials}><i className="fas fa-key mr-1" />Download Credentials ({newUsers.length})</Btn>}
+          <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />Create User</Btn>
         </div>
       </div>
 
@@ -71,7 +60,7 @@ export default function UserManagementPage() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
             <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Name', 'Email', 'Roles', 'Password Status', 'Created'].map(h => (
+              {['Name', 'Email', 'Roles', 'Password Status', 'Created', 'Actions'].map(h => (
                 <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
               ))}
             </tr></thead>
@@ -89,10 +78,13 @@ export default function UserManagementPage() {
                         )) : <span className="text-[10px]" style={{ color: 'hsl(var(--text3))' }}>No roles</span>}
                       </div>
                     </td>
-                    <td className="py-2.5 px-3.5">
-                      <Badge status={p.must_change_password ? 'pending' : 'done'} />
-                    </td>
+                    <td className="py-2.5 px-3.5"><Badge status={p.must_change_password ? 'pending' : 'done'} /></td>
                     <td className="py-2.5 px-3.5 text-[11px] font-mono" style={{ color: 'hsl(var(--text2))' }}>{p.created_at?.split('T')[0]}</td>
+                    <td className="py-2.5 px-3.5">
+                      <Btn variant="outline" size="sm" onClick={() => setResetModal(p)}>
+                        <i className="fas fa-key mr-1" />Reset PW
+                      </Btn>
+                    </td>
                   </tr>
                 );
               })}
@@ -108,7 +100,56 @@ export default function UserManagementPage() {
           invalidate(['profiles', 'user_roles']);
         }
       }} />}
+
+      {resetModal && <ResetPasswordModal profile={resetModal} onClose={() => { setResetModal(null); invalidate(['profiles']); }} />}
     </div>
+  );
+}
+
+function ResetPasswordModal({ profile, onClose }: { profile: any; onClose: () => void }) {
+  const { showToast } = useApp();
+  const [newPassword, setNewPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const generatePassword = () => {
+    const first = profile.full_name?.split(' ')[0]?.toLowerCase() || 'user';
+    return first + Math.floor(1000 + Math.random() * 9000);
+  };
+
+  const save = async () => {
+    const pw = newPassword || generatePassword();
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke('create-user', {
+      body: { action: 'reset_password', user_id: profile.user_id, new_password: pw },
+    });
+    if (error || data?.error) {
+      showToast(data?.error || error?.message || 'Failed', 'error');
+      setSaving(false);
+      return;
+    }
+    showToast(`Password reset for ${profile.full_name}. New password: ${pw}`);
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose} size="sm">
+      <ModalHead title="Reset Password" onClose={onClose} />
+      <ModalBody>
+        <div className="text-xs mb-3" style={{ color: 'hsl(var(--text2))' }}>
+          Reset password for <strong>{profile.full_name}</strong> ({profile.email})
+        </div>
+        <Field label="New Password (leave blank for auto-generated)">
+          <FieldInput value={newPassword} onChange={setNewPassword} type="text" placeholder="Auto-generate" />
+        </Field>
+        <div className="rounded-md px-3 py-2 text-[11px]" style={{ background: '#fff8c5', border: '1px solid #ffe07c', color: '#9a6700' }}>
+          ⚠ User will be required to change password on next login.
+        </div>
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={save} disabled={saving}>{saving ? 'Resetting…' : 'Reset Password'}</Btn>
+      </ModalFoot>
+    </Modal>
   );
 }
 
@@ -128,34 +169,28 @@ function CreateUserModal({ onClose }: { onClose: (created?: { email: string; pas
     if (!name.trim() || !email.trim()) return;
     setSaving(true);
     const password = generatePassword(name);
-
-    // Create auth user via edge function
     const { data, error } = await supabase.functions.invoke('create-user', {
       body: { email, password, full_name: name, role },
     });
-
     if (error || data?.error) {
       showToast(data?.error || error?.message || 'Failed to create user', 'error');
       setSaving(false);
       return;
     }
-
     showToast(`User "${name}" created with password: ${password}`);
     onClose({ email, password, name, role });
   };
 
   return (
     <Modal onClose={() => onClose()}>
-      <ModalHead title="👤 Create User Account" onClose={() => onClose()} />
+      <ModalHead title="Create User Account" onClose={() => onClose()} />
       <ModalBody>
         <Field label="Full Name" required><FieldInput value={name} onChange={setName} /></Field>
         <Field label="Email" required><FieldInput value={email} onChange={setEmail} type="email" /></Field>
         <Field label="Role" required>
           <FieldSelect value={role} onChange={setRole} options={[
-            { value: 'admin', label: 'Admin' },
-            { value: 'teacher', label: 'Teacher' },
-            { value: 'student', label: 'Student' },
-            { value: 'parent', label: 'Parent' },
+            { value: 'admin', label: 'Admin' }, { value: 'teacher', label: 'Teacher' },
+            { value: 'student', label: 'Student' }, { value: 'parent', label: 'Parent' },
           ]} />
         </Field>
         <div className="rounded-md px-3 py-2 text-[11px]" style={{ background: '#ddf4ff', border: '1px solid #addcff', color: '#0969da' }}>
