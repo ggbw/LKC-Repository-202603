@@ -32,6 +32,8 @@ function navItems(roles: AppRole[]): NavItem[] {
 
   if (isTeacher) {
     items.push({ sec: 'Academic' });
+    items.push({ id: 'students', ico: 'fas fa-graduation-cap', label: 'My Students' });
+    items.push({ id: 'exams', ico: 'fas fa-clipboard-list', label: 'Exams' });
     items.push({ id: 'assignments', ico: 'fas fa-tasks', label: 'Assignments' });
     items.push({ id: 'attendance', ico: 'fas fa-calendar-check', label: 'Attendance' });
     items.push({ id: 'results', ico: 'fas fa-chart-bar', label: 'Exam Results' });
