@@ -39,9 +39,20 @@ export default function AttendancePage() {
     });
   }, [students, markingForm, markingClass]);
 
-  const present = attendance.filter((a: any) => a.status === 'present').length;
-  const absent = attendance.filter((a: any) => a.status === 'absent').length;
-  const late = attendance.filter((a: any) => a.status === 'late').length;
+  // Filter attendance records to only show class teacher's students (not admin)
+  const visibleAttendance = useMemo(() => {
+    if (isAdmin) return attendance;
+    if (!myClasses || myClasses.length === 0) return [];
+    return attendance.filter((a: any) => {
+      const s = a.students;
+      if (!s) return false;
+      return myClasses.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name);
+    });
+  }, [attendance, isAdmin, myClasses]);
+
+  const present = visibleAttendance.filter((a: any) => a.status === 'present').length;
+  const absent = visibleAttendance.filter((a: any) => a.status === 'absent').length;
+  const late = visibleAttendance.filter((a: any) => a.status === 'late').length;
 
   const [attendanceMarks, setAttendanceMarks] = useState<Record<string, string>>({});
 
@@ -117,7 +128,7 @@ export default function AttendancePage() {
           { val: present, label: 'Present', bg: '#dafbe1', border: '#aceebb', color: '#1a7f37' },
           { val: absent, label: 'Absent', bg: '#ffebe9', border: '#ffc1ba', color: '#cf222e' },
           { val: late, label: 'Late', bg: '#fff8c5', border: '#ffe07c', color: '#9a6700' },
-          { val: attendance.length, label: 'Total', bg: '#ddf4ff', border: '#addcff', color: '#0969da' },
+          { val: visibleAttendance.length, label: 'Total', bg: '#ddf4ff', border: '#addcff', color: '#0969da' },
         ].map(item => (
           <div key={item.label} className="rounded-lg px-4 py-3.5" style={{ background: item.bg, border: `1px solid ${item.border}` }}>
             <div className="text-[28px] font-bold font-mono" style={{ color: item.color }}>{item.val}</div>
@@ -178,7 +189,7 @@ export default function AttendancePage() {
                   ))}
                 </tr></thead>
                 <tbody>
-                  {attendance.slice(0, 50).map((a: any) => (
+                  {visibleAttendance.slice(0, 50).map((a: any) => (
                     <tr key={a.id} style={{ borderBottom: '1px solid #f6f8fa' }}>
                       <td className="py-2.5 px-3.5 font-semibold">{a.students?.full_name || '—'}</td>
                       <td className="py-2.5 px-3.5">{a.students?.form || '—'}</td>
@@ -189,7 +200,7 @@ export default function AttendancePage() {
                   ))}
                 </tbody>
               </table>
-              <div className="text-[11px] mt-2" style={{ color: 'hsl(var(--text2))' }}>{attendance.length} records</div>
+              <div className="text-[11px] mt-2" style={{ color: 'hsl(var(--text2))' }}>{visibleAttendance.length} records</div>
             </div>
           )}
         </Card>
