@@ -351,19 +351,53 @@ function SubjectTeacherModal({ subjects, teachers, onClose }: { subjects: any[];
 
 function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[]; students: any[]; onClose: () => void }) {
   const { showToast } = useApp();
+  const { data: subjectTeachersAll = [] } = useSubjectTeachers();
+  const { data: existingStudentSubjects = [] } = useStudentSubjects();
   const [subjectId, setSubjectId] = useState('');
   const [filterForm, setFilterForm] = useState('Form 1');
+  const [filterClass, setFilterClass] = useState('');
+  const [searchStr, setSearchStr] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const formStudents = students.filter((s: any) => s.form === filterForm && s.state === 'active');
+  // Teachers who teach the selected subject
+  const matchedTeachers = useMemo(() => {
+    if (!subjectId) return [];
+    return subjectTeachersAll
+      .filter((st: any) => st.subject_id === subjectId)
+      .map((st: any) => st.teachers)
+      .filter(Boolean);
+  }, [subjectId, subjectTeachersAll]);
+
+  // Students already mapped to this subject
+  const alreadyMappedIds = useMemo(() => {
+    if (!subjectId) return new Set<string>();
+    return new Set(existingStudentSubjects.filter((ss: any) => ss.subject_id === subjectId).map((ss: any) => ss.student_id));
+  }, [subjectId, existingStudentSubjects]);
+
+  // Available classes for current form
+  const availableClasses = useMemo(() => {
+    return [...new Set(students.filter((s: any) => s.form === filterForm && s.state === 'active').map((s: any) => s.class_name).filter(Boolean))].sort();
+  }, [students, filterForm]);
+
+  const formStudents = useMemo(() => {
+    return students.filter((s: any) =>
+      s.form === filterForm && s.state === 'active' &&
+      (!filterClass || s.class_name === filterClass) &&
+      (!searchStr || s.full_name.toLowerCase().includes(searchStr.toLowerCase()) || (s.enrollment_number || '').toLowerCase().includes(searchStr.toLowerCase()))
+    );
+  }, [students, filterForm, filterClass, searchStr]);
+
+  // Split into unmapped and already-mapped
+  const unmappedStudents = formStudents.filter(s => !alreadyMappedIds.has(s.id));
+  const mappedStudents = formStudents.filter(s => alreadyMappedIds.has(s.id));
 
   const toggleStudent = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const selectAll = () => {
-    const ids = formStudents.map((s: any) => s.id);
+    const ids = unmappedStudents.map((s: any) => s.id);
     setSelectedIds(prev => {
       const allSelected = ids.every(id => prev.includes(id));
       if (allSelected) return prev.filter(id => !ids.includes(id));
@@ -375,7 +409,6 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
     if (!subjectId || selectedIds.length === 0) return;
     setSaving(true);
     const records = selectedIds.map(sid => ({ subject_id: subjectId, student_id: sid }));
-    // Insert in batches
     for (let i = 0; i < records.length; i += 50) {
       const batch = records.slice(i, i + 50);
       const { error } = await supabase.from('student_subjects').insert(batch);
@@ -385,42 +418,105 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
     onClose();
   };
 
+  const selectedSubject = subjects.find((s: any) => s.id === subjectId);
+
   return (
     <Modal onClose={onClose} size="lg">
       <ModalHead title="Map Subject to Students" onClose={onClose} />
       <ModalBody>
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <Field label="Subject" required>
-            <FieldSelect value={subjectId} onChange={setSubjectId}
-              options={[{ value: '', label: '— Select Subject —' }, ...subjects.map((s: any) => ({ value: s.id, label: `${s.name} (${s.code})` }))]} />
-          </Field>
-          <Field label="Form">
-            <FieldSelect value={filterForm} onChange={v => { setFilterForm(v); setSelectedIds([]); }} options={FORMS.map(f => ({ value: f, label: f }))} />
-          </Field>
+        {/* Step 1: Select Subject */}
+        <div className="mb-4">
+          <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
+            <i className="fas fa-book mr-1.5" />Step 1 — Select Subject
+          </div>
+          <FieldSelect value={subjectId} onChange={v => { setSubjectId(v); setSelectedIds([]); }}
+            options={[{ value: '', label: '— Select Subject —' }, ...subjects.map((s: any) => ({ value: s.id, label: `${s.name} (${s.code || ''})` }))]} />
         </div>
+
+        {/* Dynamic Teacher Match */}
+        {subjectId && (
+          <div className="mb-4 p-3 rounded-lg" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>
+            <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: 'hsl(var(--text2))' }}>
+              <i className="fas fa-chalkboard-teacher mr-1.5" />Teachers for {selectedSubject?.name}
+            </div>
+            {matchedTeachers.length === 0 ? (
+              <div className="text-[11px]" style={{ color: 'hsl(var(--text3))' }}>No teachers assigned to this subject yet.</div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {matchedTeachers.map((t: any, i: number) => (
+                  <span key={i} className="rounded-[5px] px-2.5 py-1 text-[11px] font-semibold" style={{ background: '#ddf4ff', color: '#0969da' }}>
+                    <i className="fas fa-user mr-1" />{t.name}
+                    {t.department && <span className="font-normal ml-1 text-[9px]" style={{ color: '#0969da99' }}>({t.department})</span>}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 2: Select Students */}
         {subjectId && (
           <>
-            <div className="flex justify-between items-center mb-2">
-              <div className="text-[11px] font-semibold" style={{ color: 'hsl(var(--text2))' }}>{formStudents.length} students in {filterForm}</div>
-              <Btn variant="outline" size="sm" onClick={selectAll}>{formStudents.every(s => selectedIds.includes(s.id)) ? 'Deselect All' : 'Select All'}</Btn>
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
+              <i className="fas fa-users mr-1.5" />Step 2 — Select Students
             </div>
-            <div className="max-h-[300px] overflow-y-auto border rounded-md p-2" style={{ borderColor: 'hsl(var(--border))' }}>
-              {formStudents.map((s: any) => (
-                <label key={s.id} className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-[hsl(var(--surface2))] text-[12px]">
-                  <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} />
-                  <span className="font-semibold">{s.full_name}</span>
-                  <span className="text-[10px] font-mono" style={{ color: 'hsl(var(--text3))' }}>{s.enrollment_number}</span>
-                  <span className="text-[10px]" style={{ color: 'hsl(var(--text3))' }}>{s.class_name}</span>
+            <div className="flex gap-2 mb-3">
+              <FieldSelect value={filterForm} onChange={v => { setFilterForm(v); setFilterClass(''); setSelectedIds([]); }}
+                options={FORMS.map(f => ({ value: f, label: f }))} />
+              <FieldSelect value={filterClass} onChange={setFilterClass}
+                options={[{ value: '', label: 'All Classes' }, ...availableClasses.map(c => ({ value: c, label: c }))]} />
+              <input
+                className="flex-1 h-[34px] rounded-md border px-3 text-[12px]"
+                style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--surface1))' }}
+                placeholder="🔍 Search student name or enrollment..."
+                value={searchStr} onChange={e => setSearchStr(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[11px] font-semibold" style={{ color: 'hsl(var(--text2))' }}>
+                {unmappedStudents.length} available · {mappedStudents.length} already mapped
+              </div>
+              <Btn variant="outline" size="sm" onClick={selectAll}>
+                {unmappedStudents.length > 0 && unmappedStudents.every(s => selectedIds.includes(s.id)) ? 'Deselect All' : 'Select All'}
+              </Btn>
+            </div>
+
+            <div className="max-h-[280px] overflow-y-auto border rounded-md" style={{ borderColor: 'hsl(var(--border))' }}>
+              {unmappedStudents.length === 0 && mappedStudents.length === 0 && (
+                <div className="py-6 text-center text-[11px]" style={{ color: 'hsl(var(--text3))' }}>No students found</div>
+              )}
+              {unmappedStudents.map((s: any) => (
+                <label key={s.id} className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-[hsl(var(--surface2))] text-[12px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
+                  <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} className="accent-[#1a3fa0]" />
+                  <span className="font-semibold flex-1">{s.full_name}</span>
+                  <span className="text-[10px] font-mono" style={{ color: 'hsl(var(--text3))' }}>{s.enrollment_number || '—'}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text2))' }}>{s.class_name || '—'}</span>
                 </label>
               ))}
+              {mappedStudents.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text3))' }}>Already Mapped</div>
+                  {mappedStudents.map((s: any) => (
+                    <div key={s.id} className="flex items-center gap-2 py-2 px-3 text-[12px] opacity-50" style={{ borderBottom: '1px solid #f6f8fa' }}>
+                      <i className="fas fa-check text-[10px]" style={{ color: '#1a7f37' }} />
+                      <span className="flex-1">{s.full_name}</span>
+                      <span className="text-[10px] font-mono" style={{ color: 'hsl(var(--text3))' }}>{s.enrollment_number || '—'}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text2))' }}>{s.class_name || '—'}</span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
-            <div className="text-[10px] mt-1" style={{ color: 'hsl(var(--text3))' }}>{selectedIds.length} selected</div>
+            <div className="text-[10px] mt-1.5" style={{ color: 'hsl(var(--text3))' }}>{selectedIds.length} student(s) selected for mapping</div>
           </>
         )}
       </ModalBody>
       <ModalFoot>
         <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : `Map ${selectedIds.length} Students`}</Btn>
+        <Btn onClick={save} disabled={saving || selectedIds.length === 0}>
+          {saving ? 'Mapping…' : `Map ${selectedIds.length} Student${selectedIds.length !== 1 ? 's' : ''}`}
+        </Btn>
       </ModalFoot>
     </Modal>
   );
