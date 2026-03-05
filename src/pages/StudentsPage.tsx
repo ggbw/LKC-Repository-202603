@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { useStudents, useTeachers, useSubjectTeachers, useStudentSubjects, useClassTeachers, useInvalidate } from '@/hooks/useSupabaseData';
+import { useStudents, useTeachers, useSubjects, useSubjectTeachers, useStudentSubjects, useClassTeachers, useInvalidate } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { FORMS, cap, formatDate } from '@/data/database';
 import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
@@ -13,6 +13,7 @@ export default function StudentsPage() {
   const { isAdmin, isTeacher, user } = useAuth();
   const { data: students = [], isLoading } = useStudents();
   const { data: teachers = [] } = useTeachers();
+  const { data: subjects = [] } = useSubjects();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: studentSubjects = [] } = useStudentSubjects();
   const { data: classTeachers = [] } = useClassTeachers();
@@ -25,32 +26,61 @@ export default function StudentsPage() {
 
   const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
 
+  // For teachers: get subject IDs and class assignments
+  const mySubjectIds = useMemo(() => {
+    if (!myTeacher) return [];
+    return subjectTeachers.filter((st: any) => st.teacher_id === myTeacher.id).map((st: any) => st.subject_id);
+  }, [subjectTeachers, myTeacher]);
+
+  const myClassAssignments = useMemo(() => {
+    if (!myTeacher) return [];
+    return classTeachers.filter((ct: any) => ct.teacher_id === myTeacher.id);
+  }, [classTeachers, myTeacher]);
+
   // Teachers only see students taking their subjects or in their class teacher classes
   const visibleStudents = useMemo(() => {
     if (isAdmin) return students;
     if (isTeacher && myTeacher) {
-      // Get subject IDs this teacher teaches
-      const mySubjectIds = subjectTeachers
-        .filter((st: any) => st.teacher_id === myTeacher.id)
-        .map((st: any) => st.subject_id);
-      // Get student IDs enrolled in those subjects
       const subjectStudentIds = new Set(
         studentSubjects
           .filter((ss: any) => mySubjectIds.includes(ss.subject_id))
           .map((ss: any) => ss.student_id)
       );
-      // Get student IDs from class teacher assignments
-      const myClassAssignments = classTeachers.filter((ct: any) => ct.teacher_id === myTeacher.id);
       const classStudentIds = new Set(
         students
           .filter((s: any) => myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name))
           .map((s: any) => s.id)
       );
-      // Union of both sets
       return students.filter((s: any) => subjectStudentIds.has(s.id) || classStudentIds.has(s.id));
     }
     return students;
-  }, [students, isAdmin, isTeacher, myTeacher, subjectTeachers, studentSubjects, classTeachers]);
+  }, [students, isAdmin, isTeacher, myTeacher, mySubjectIds, myClassAssignments, studentSubjects]);
+
+  // For teacher view: map student → subjects taught by this teacher
+  const studentSubjectMap = useMemo(() => {
+    if (!isTeacher || !myTeacher) return {};
+    const map: Record<string, string[]> = {};
+    for (const ss of studentSubjects) {
+      if (mySubjectIds.includes(ss.subject_id)) {
+        const subj = subjects.find((s: any) => s.id === ss.subject_id);
+        if (subj) {
+          if (!map[ss.student_id]) map[ss.student_id] = [];
+          map[ss.student_id].push(subj.name);
+        }
+      }
+    }
+    return map;
+  }, [isTeacher, myTeacher, studentSubjects, mySubjectIds, subjects]);
+
+  // For teacher view: which students are in class teacher classes
+  const classTeacherStudentIds = useMemo(() => {
+    if (!isTeacher || !myTeacher) return new Set<string>();
+    return new Set(
+      students
+        .filter((s: any) => myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name))
+        .map((s: any) => s.id)
+    );
+  }, [isTeacher, myTeacher, students, myClassAssignments]);
 
   if (detail) return <StudentDetail id={detail} onBack={() => setDetail(null)} />;
 
@@ -119,7 +149,7 @@ export default function StudentsPage() {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[12.5px]">
               <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-                {['Enrollment','Name','Form','Class','Gender','Status', ...(isAdmin ? ['Actions'] : [])].map(h => (
+                {['Enrollment','Name','Form','Class','Gender', ...(isTeacher && !isAdmin ? ['Subjects','Relation'] : []), 'Status', ...(isAdmin ? ['Actions'] : [])].map(h => (
                   <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
                 ))}
               </tr></thead>
@@ -131,6 +161,23 @@ export default function StudentsPage() {
                     <td className="py-2.5 px-3.5">{s.form}</td>
                     <td className="py-2.5 px-3.5 text-[11px] font-mono">{s.class_name || '—'}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">{cap(s.gender || '')}</td>
+                    {isTeacher && !isAdmin && (
+                      <>
+                        <td className="py-2.5 px-3.5 text-[10px]" style={{ color: 'hsl(var(--text2))' }}>
+                          {(studentSubjectMap[s.id] || []).join(', ') || '—'}
+                        </td>
+                        <td className="py-2.5 px-3.5">
+                          <div className="flex gap-1">
+                            {(studentSubjectMap[s.id] || []).length > 0 && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#ddf4ff', color: '#0969da' }}>Subject</span>
+                            )}
+                            {classTeacherStudentIds.has(s.id) && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#dafbe1', color: '#1a7f37' }}>My Class</span>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
                     <td className="py-2.5 px-3.5"><Badge status={s.state || 'active'} /></td>
                     {isAdmin && (
                       <td className="py-2.5 px-3.5">
