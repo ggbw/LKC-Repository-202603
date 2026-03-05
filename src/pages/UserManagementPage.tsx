@@ -1,58 +1,222 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
-import { useProfiles, useUserRoles, useInvalidate } from '@/hooks/useSupabaseData';
+import { useProfiles, useUserRoles, useTeachers, useStudents, useParents, useInvalidate } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
-import { cap } from '@/data/database';
 import { downloadExcel, downloadCSV } from '@/lib/excel';
 import { Card, Badge, Btn, SearchBar, FilterSelect,
   Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
 
+type RoleFilter = 'all' | 'admin' | 'teacher' | 'student' | 'parent' | 'no-account';
+
+interface UnifiedUser {
+  id: string;
+  name: string;
+  email: string | null;
+  roles: string[];
+  hasAccount: boolean;
+  mustChangePassword: boolean;
+  userId: string | null; // auth user id
+  profileId: string | null;
+  source: ('profile' | 'teacher' | 'student' | 'parent')[];
+  createdAt: string | null;
+  form?: string | null;
+  department?: string | null;
+}
+
 export default function UserManagementPage() {
   const { isAdmin } = useAuth();
   const { showToast } = useApp();
-  const { data: profiles = [], isLoading } = useProfiles();
+  const { data: profiles = [], isLoading: pLoading } = useProfiles();
   const { data: userRoles = [] } = useUserRoles();
+  const { data: teachers = [], isLoading: tLoading } = useTeachers();
+  const { data: students = [], isLoading: sLoading } = useStudents();
+  const { data: parents = [], isLoading: prLoading } = useParents();
   const invalidate = useInvalidate();
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   const [modal, setModal] = useState(false);
   const [resetModal, setResetModal] = useState<any>(null);
   const [newUsers, setNewUsers] = useState<{ email: string; password: string; name: string; role: string }[]>([]);
 
-  if (!isAdmin) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Access denied</div></div>;
+  const isLoading = pLoading || tLoading || sLoading || prLoading;
 
   const getRoles = (userId: string) => userRoles.filter((r: any) => r.user_id === userId).map((r: any) => r.role);
 
-  const rows = profiles.filter((p: any) =>
-    !search || p.full_name?.toLowerCase().includes(search.toLowerCase()) || p.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Build unified user list
+  const unifiedUsers = useMemo(() => {
+    const userMap = new Map<string, UnifiedUser>();
+
+    // 1. Add all profiles (users with accounts)
+    profiles.forEach((p: any) => {
+      const key = p.user_id;
+      userMap.set(key, {
+        id: key,
+        name: p.full_name,
+        email: p.email,
+        roles: getRoles(p.user_id),
+        hasAccount: true,
+        mustChangePassword: p.must_change_password ?? false,
+        userId: p.user_id,
+        profileId: p.id,
+        source: ['profile'],
+        createdAt: p.created_at,
+      });
+    });
+
+    // 2. Cross-reference teachers
+    teachers.forEach((t: any) => {
+      if (t.user_id && userMap.has(t.user_id)) {
+        const existing = userMap.get(t.user_id)!;
+        existing.source.push('teacher');
+        existing.department = t.department;
+      } else {
+        // Teacher without account
+        const key = `teacher-${t.id}`;
+        userMap.set(key, {
+          id: key,
+          name: t.name,
+          email: t.email,
+          roles: ['teacher'],
+          hasAccount: false,
+          mustChangePassword: false,
+          userId: null,
+          profileId: null,
+          source: ['teacher'],
+          createdAt: t.created_at,
+          department: t.department,
+        });
+      }
+    });
+
+    // 3. Cross-reference students
+    students.forEach((s: any) => {
+      if (s.user_id && userMap.has(s.user_id)) {
+        const existing = userMap.get(s.user_id)!;
+        existing.source.push('student');
+        existing.form = s.form;
+      } else {
+        const key = `student-${s.id}`;
+        userMap.set(key, {
+          id: key,
+          name: s.full_name,
+          email: s.email,
+          roles: ['student'],
+          hasAccount: false,
+          mustChangePassword: false,
+          userId: null,
+          profileId: null,
+          source: ['student'],
+          createdAt: s.created_at,
+          form: s.form,
+        });
+      }
+    });
+
+    // 4. Cross-reference parents
+    parents.forEach((pr: any) => {
+      if (pr.user_id && userMap.has(pr.user_id)) {
+        const existing = userMap.get(pr.user_id)!;
+        existing.source.push('parent');
+      } else {
+        const key = `parent-${pr.id}`;
+        userMap.set(key, {
+          id: key,
+          name: pr.name,
+          email: pr.email,
+          roles: ['parent'],
+          hasAccount: false,
+          mustChangePassword: false,
+          userId: null,
+          profileId: null,
+          source: ['parent'],
+          createdAt: pr.created_at,
+        });
+      }
+    });
+
+    return Array.from(userMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [profiles, teachers, students, parents, userRoles]);
+
+  // Filter
+  const rows = useMemo(() => {
+    return unifiedUsers.filter(u => {
+      if (search) {
+        const s = search.toLowerCase();
+        if (!u.name?.toLowerCase().includes(s) && !u.email?.toLowerCase().includes(s)) return false;
+      }
+      if (roleFilter === 'no-account') return !u.hasAccount;
+      if (roleFilter !== 'all') return u.roles.includes(roleFilter) || u.source.includes(roleFilter as any);
+      return true;
+    });
+  }, [unifiedUsers, search, roleFilter]);
+
+  const counts = useMemo(() => ({
+    all: unifiedUsers.length,
+    teacher: unifiedUsers.filter(u => u.roles.includes('teacher') || u.source.includes('teacher')).length,
+    student: unifiedUsers.filter(u => u.roles.includes('student') || u.source.includes('student')).length,
+    parent: unifiedUsers.filter(u => u.roles.includes('parent') || u.source.includes('parent')).length,
+    admin: unifiedUsers.filter(u => u.roles.includes('admin')).length,
+    noAccount: unifiedUsers.filter(u => !u.hasAccount).length,
+  }), [unifiedUsers]);
 
   const downloadCredentials = () => {
     if (newUsers.length === 0) { showToast('No new credentials to download', 'info'); return; }
     downloadCSV(newUsers.map(u => ({ Name: u.name, Email: u.email, Password: u.password, Role: u.role })), 'lkc_user_credentials');
     showToast('Credentials downloaded');
   };
-
   const downloadAllUsers = () => {
-    const data = profiles.map((p: any) => ({
-      Name: p.full_name, Email: p.email, Roles: getRoles(p.user_id).join(', '),
-      'Must Change Password': p.must_change_password ? 'Yes' : 'No', 'Created At': p.created_at,
+    const data = unifiedUsers.map(u => ({
+      Name: u.name, Email: u.email || '', Roles: u.roles.join(', '),
+      'Has Account': u.hasAccount ? 'Yes' : 'No',
+      'Must Change Password': u.mustChangePassword ? 'Yes' : 'No',
+      'Created At': u.createdAt?.split('T')[0] || '',
     }));
     downloadExcel(data, 'lkc_all_users', 'Users');
     showToast('Users exported');
   };
 
+  if (!isAdmin) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Access denied</div></div>;
+
   if (isLoading) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Loading...</div></div>;
+
+  const filterTabs: { key: RoleFilter; label: string; count: number }[] = [
+    { key: 'all', label: 'All', count: counts.all },
+    { key: 'teacher', label: 'Teachers', count: counts.teacher },
+    { key: 'student', label: 'Students', count: counts.student },
+    { key: 'parent', label: 'Parents', count: counts.parent },
+    { key: 'admin', label: 'Admins', count: counts.admin },
+    { key: 'no-account', label: 'No Account', count: counts.noAccount },
+  ];
 
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold"><i className="fas fa-user-cog mr-2" />User Management</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{profiles.length} users</div></div>
+        <div>
+          <div className="text-lg font-bold"><i className="fas fa-user-cog mr-2" />User Management</div>
+          <div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>
+            {counts.all} total · {counts.noAccount > 0 && <span style={{ color: '#cf222e' }}>{counts.noAccount} without accounts</span>}
+          </div>
+        </div>
         <div className="flex gap-2">
-          <Btn variant="outline" onClick={downloadAllUsers}><i className="fas fa-download mr-1" />Export Users</Btn>
-          {newUsers.length > 0 && <Btn variant="purple" onClick={downloadCredentials}><i className="fas fa-key mr-1" />Download Credentials ({newUsers.length})</Btn>}
+          <Btn variant="outline" onClick={downloadAllUsers}><i className="fas fa-download mr-1" />Export</Btn>
+          {newUsers.length > 0 && <Btn variant="purple" onClick={downloadCredentials}><i className="fas fa-key mr-1" />Credentials ({newUsers.length})</Btn>}
           <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />Create User</Btn>
         </div>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {filterTabs.map(t => (
+          <button key={t.key} onClick={() => setRoleFilter(t.key)}
+            className="px-3 py-1.5 rounded-md text-[11px] font-semibold cursor-pointer border-none transition-all"
+            style={{
+              background: roleFilter === t.key ? 'hsl(var(--primary))' : 'hsl(var(--surface2))',
+              color: roleFilter === t.key ? '#fff' : 'hsl(var(--text2))',
+            }}>
+            {t.label} <span className="ml-1 opacity-70">({t.count})</span>
+          </button>
+        ))}
       </div>
 
       <Card>
@@ -60,34 +224,52 @@ export default function UserManagementPage() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
             <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Name', 'Email', 'Roles', 'Password Status', 'Created', 'Actions'].map(h => (
+              {['Name', 'Email', 'Roles', 'Account', 'Details', 'Actions'].map(h => (
                 <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {rows.map((p: any) => {
-                const roles = getRoles(p.user_id);
-                return (
-                  <tr key={p.id} style={{ borderBottom: '1px solid #f6f8fa' }}>
-                    <td className="py-2.5 px-3.5 font-semibold">{p.full_name}</td>
-                    <td className="py-2.5 px-3.5 text-[11px]">{p.email}</td>
-                    <td className="py-2.5 px-3.5">
-                      <div className="flex gap-1 flex-wrap">
-                        {roles.length > 0 ? roles.map((r: string) => (
-                          <span key={r} className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>{r}</span>
-                        )) : <span className="text-[10px]" style={{ color: 'hsl(var(--text3))' }}>No roles</span>}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-3.5"><Badge status={p.must_change_password ? 'pending' : 'done'} /></td>
-                    <td className="py-2.5 px-3.5 text-[11px] font-mono" style={{ color: 'hsl(var(--text2))' }}>{p.created_at?.split('T')[0]}</td>
-                    <td className="py-2.5 px-3.5">
-                      <Btn variant="outline" size="sm" onClick={() => setResetModal(p)}>
-                        <i className="fas fa-key mr-1" />Reset PW
-                      </Btn>
-                    </td>
-                  </tr>
-                );
-              })}
+              {rows.map((u) => (
+                <tr key={u.id} style={{ borderBottom: '1px solid hsl(var(--border))' }}>
+                  <td className="py-2.5 px-3.5 font-semibold">{u.name}</td>
+                  <td className="py-2.5 px-3.5 text-[11px]">{u.email || <span style={{ color: 'hsl(var(--text3))' }}>—</span>}</td>
+                  <td className="py-2.5 px-3.5">
+                    <div className="flex gap-1 flex-wrap">
+                      {u.roles.length > 0 ? u.roles.map((r: string) => (
+                        <span key={r} className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>{r}</span>
+                      )) : <span className="text-[10px]" style={{ color: 'hsl(var(--text3))' }}>No roles</span>}
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-3.5">
+                    {u.hasAccount ? (
+                      <Badge status={u.mustChangePassword ? 'pending' : 'done'} />
+                    ) : (
+                      <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: '#ffebe9', color: '#cf222e', border: '1px solid #ffcecb' }}>No Account</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3.5 text-[11px]" style={{ color: 'hsl(var(--text2))' }}>
+                    {u.form && <span className="mr-2">Form {u.form}</span>}
+                    {u.department && <span>{u.department}</span>}
+                    {!u.form && !u.department && <span>{u.createdAt?.split('T')[0] || '—'}</span>}
+                  </td>
+                  <td className="py-2.5 px-3.5">
+                    <div className="flex gap-1">
+                      {u.hasAccount ? (
+                        <Btn variant="outline" size="sm" onClick={() => setResetModal({ full_name: u.name, email: u.email, user_id: u.userId })}>
+                          <i className="fas fa-key mr-1" />Reset PW
+                        </Btn>
+                      ) : (
+                        <Btn size="sm" onClick={() => setModal(true)}>
+                          <i className="fas fa-user-plus mr-1" />Create Account
+                        </Btn>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={6} className="py-8 text-center text-[12px]" style={{ color: 'hsl(var(--text3))' }}>No users found</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -97,7 +279,7 @@ export default function UserManagementPage() {
         setModal(false);
         if (created) {
           setNewUsers(prev => [...prev, created]);
-          invalidate(['profiles', 'user_roles']);
+          invalidate(['profiles', 'user_roles', 'teachers', 'students', 'parents']);
         }
       }} />}
 
