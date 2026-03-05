@@ -190,13 +190,44 @@ export type Database = {
           },
         ]
       }
+      class_teachers: {
+        Row: {
+          class_name: string
+          form: string
+          id: string
+          teacher_id: string
+        }
+        Insert: {
+          class_name: string
+          form: string
+          id?: string
+          teacher_id: string
+        }
+        Update: {
+          class_name?: string
+          form?: string
+          id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_teachers_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exam_results: {
         Row: {
           created_at: string | null
           exam_name: string
           id: string
+          long_comment: string | null
           max_marks: number
           obtained_marks: number
+          short_comment: string | null
           state: string | null
           student_id: string
           subject_id: string
@@ -206,8 +237,10 @@ export type Database = {
           created_at?: string | null
           exam_name: string
           id?: string
+          long_comment?: string | null
           max_marks?: number
           obtained_marks: number
+          short_comment?: string | null
           state?: string | null
           student_id: string
           subject_id: string
@@ -217,8 +250,10 @@ export type Database = {
           created_at?: string | null
           exam_name?: string
           id?: string
+          long_comment?: string | null
           max_marks?: number
           obtained_marks?: number
+          short_comment?: string | null
           state?: string | null
           student_id?: string
           subject_id?: string

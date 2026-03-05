@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { useExams, useExamResults, useSubjects, useStudents, useTeachers, useInvalidate } from '@/hooks/useSupabaseData';
+import React, { useState, useMemo } from 'react';
+import { useExams, useExamResults, useSubjects, useStudents, useTeachers, useSubjectTeachers, useStudentSubjects, useInvalidate } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import { FORMS, cap, formatDate, G, P } from '@/data/database';
 import { downloadExcel } from '@/lib/excel';
 import { Badge, Card, StatCard, Btn, BackBtn, GradeChip, FilterSelect,
-  Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
+  Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect, FieldTextarea } from '@/components/SharedUI';
 
 export default function ExamsPage() {
   const { detail, setDetail, showToast } = useApp();
@@ -88,20 +88,31 @@ export default function ExamsPage() {
 
 function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { showToast } = useApp();
-  const { isAdmin, isHOD, isTeacher } = useAuth();
+  const { isAdmin, isHOD, isTeacher, user } = useAuth();
   const { data: exams = [] } = useExams();
   const { data: subjects = [] } = useSubjects();
   const { data: students = [] } = useStudents();
   const { data: teachers = [] } = useTeachers();
+  const { data: subjectTeachers = [] } = useSubjectTeachers();
   const invalidate = useInvalidate();
   const exam = exams.find((e: any) => e.id === id) as any;
   const { data: results = [] } = useExamResults(exam?.name);
   const [resultModal, setResultModal] = useState(false);
+  const [commentModal, setCommentModal] = useState<any>(null);
   const [filterSubject, setFilterSubject] = useState('');
 
   if (!exam) return <><BackBtn onClick={onBack} label="Back" /><div>Not found</div></>;
 
-  const filtResults = results.filter((r: any) => !filterSubject || r.subject_id === filterSubject);
+  // For teachers, only show subjects they teach
+  const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
+  const mySubjectIds = myTeacher ? subjectTeachers.filter((st: any) => st.teacher_id === myTeacher.id).map((st: any) => st.subject_id) : [];
+
+  const filtResults = results.filter((r: any) => {
+    if (filterSubject && r.subject_id !== filterSubject) return false;
+    // Teachers only see their subjects' results
+    if (isTeacher && !isAdmin && !isHOD && mySubjectIds.length > 0 && !mySubjectIds.includes(r.subject_id)) return false;
+    return true;
+  });
   const subjectsInResults = [...new Set(results.map((r: any) => r.subject_id))];
 
   const handleExport = () => {
@@ -110,7 +121,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
       return {
         'Student': r.students?.full_name || '', 'Enrollment': r.students?.enrollment_number || '',
         'Subject': r.subjects?.name || '', 'Obtained': r.obtained_marks, 'Max': r.max_marks,
-        '%': p, 'Grade': G(p),
+        '%': p, 'Grade': G(p), 'Short Comment': r.short_comment || '', 'Long Comment': r.long_comment || '',
       };
     }), `${exam.name}_results`, 'Results');
     showToast('Exported');
@@ -121,7 +132,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
       <BackBtn onClick={onBack} label="Back to Examinations" />
       <div className="flex items-start gap-4 mb-5 pb-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
         <div className="w-[72px] h-[72px] rounded-[14px] flex items-center justify-center flex-shrink-0" style={{ background: 'hsl(var(--surface2))', border: '2px solid hsl(var(--border))' }}>
-          <i className="fas fa-clipboard-list" style={{ fontSize: '28px', color: 'hsl(var(--accent-blue))' }} />
+          <i className="fas fa-clipboard-list" style={{ fontSize: '28px', color: '#1a3fa0' }} />
         </div>
         <div>
           <div className="text-xl font-bold">{exam.name}</div>
@@ -150,7 +161,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[12.5px]">
               <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-                {['Student','Form','Subject','Marks','%','Grade'].map(h => (
+                {['Student','Form','Subject','Marks','%','Grade','Comment','Actions'].map(h => (
                   <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
                 ))}
               </tr></thead>
@@ -165,6 +176,16 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
                       <td className="py-2.5 px-3.5 font-mono text-[11px]">{r.obtained_marks}/{r.max_marks}</td>
                       <td className="py-2.5 px-3.5 font-mono font-bold">{p}%</td>
                       <td className="py-2.5 px-3.5"><GradeChip grade={G(p)} /></td>
+                      <td className="py-2.5 px-3.5 text-[10px] max-w-[120px] truncate" style={{ color: 'hsl(var(--text2))' }}>
+                        {r.short_comment || '—'}
+                      </td>
+                      <td className="py-2.5 px-3.5">
+                        {(isAdmin || isTeacher || isHOD) && (
+                          <Btn variant="outline" size="sm" onClick={() => setCommentModal(r)}>
+                            <i className="fas fa-comment mr-1" />
+                          </Btn>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -174,9 +195,51 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
         )}
       </Card>
 
-      {resultModal && <ResultModal examName={exam.name} subjects={subjects} students={students} teachers={teachers}
+      {resultModal && <ResultModal examName={exam.name} examForm={exam.form} subjects={subjects} students={students} teachers={teachers}
+        subjectTeachers={subjectTeachers}
         onClose={() => { setResultModal(false); invalidate(['exam_results']); }} />}
+
+      {commentModal && <CommentModal result={commentModal} onClose={() => { setCommentModal(null); invalidate(['exam_results']); }} />}
     </div>
+  );
+}
+
+function CommentModal({ result, onClose }: { result: any; onClose: () => void }) {
+  const { showToast } = useApp();
+  const [shortComment, setShortComment] = useState(result.short_comment || '');
+  const [longComment, setLongComment] = useState(result.long_comment || '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    const { error } = await supabase.from('exam_results').update({
+      short_comment: shortComment || null,
+      long_comment: longComment || null,
+    }).eq('id', result.id);
+    if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+    showToast('Comments saved');
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHead title={`Comments — ${result.students?.full_name}`} onClose={onClose} />
+      <ModalBody>
+        <div className="text-[11px] mb-3" style={{ color: 'hsl(var(--text2))' }}>
+          {result.subjects?.name} · {result.obtained_marks}/{result.max_marks}
+        </div>
+        <Field label="Short Comment (for parents, not on report card)">
+          <FieldTextarea value={shortComment} onChange={setShortComment} placeholder="e.g. Good improvement, needs more practice..." minHeight="60px" />
+        </Field>
+        <Field label="Long Comment (appears on report card)">
+          <FieldTextarea value={longComment} onChange={setLongComment} placeholder="Detailed comment for the report card..." minHeight="100px" />
+        </Field>
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save Comments'}</Btn>
+      </ModalFoot>
+    </Modal>
   );
 }
 
@@ -218,29 +281,40 @@ function ExamModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ResultModal({ examName, subjects, students, teachers, onClose }: {
-  examName: string; subjects: any[]; students: any[]; teachers: any[]; onClose: () => void;
+function ResultModal({ examName, examForm, subjects, students, teachers, subjectTeachers, onClose }: {
+  examName: string; examForm: string; subjects: any[]; students: any[]; teachers: any[]; subjectTeachers: any[]; onClose: () => void;
 }) {
   const { showToast } = useApp();
-  const { user } = useAuth();
+  const { user, isAdmin, isHOD } = useAuth();
   const [subjectId, setSubjectId] = useState('');
-  const [filterForm, setFilterForm] = useState('Form 1');
+  const [filterForm, setFilterForm] = useState(examForm !== 'All Forms' ? examForm : 'Form 1');
   const [maxMarks, setMaxMarks] = useState('100');
   const [marks, setMarks] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
+  
+  // Teachers only see their assigned subjects
+  const availableSubjects = useMemo(() => {
+    if (isAdmin || isHOD) return subjects;
+    if (myTeacher) {
+      const mySubjectIds = subjectTeachers.filter((st: any) => st.teacher_id === myTeacher.id).map((st: any) => st.subject_id);
+      return subjects.filter((s: any) => mySubjectIds.includes(s.id));
+    }
+    return subjects;
+  }, [subjects, subjectTeachers, myTeacher, isAdmin, isHOD]);
 
   const formStudents = students.filter((s: any) => s.form === filterForm && s.state === 'active');
 
   const save = async () => {
     if (!subjectId) return;
     setSaving(true);
-    const teacher = teachers.find((t: any) => t.user_id === user?.id);
     const records = Object.entries(marks)
       .filter(([, v]) => v !== '')
       .map(([studentId, obtained]) => ({
         exam_name: examName, student_id: studentId, subject_id: subjectId,
         obtained_marks: Number(obtained), max_marks: Number(maxMarks),
-        teacher_id: teacher?.id || null, state: 'done',
+        teacher_id: myTeacher?.id || null, state: 'done',
       }));
     if (records.length === 0) { showToast('Enter at least one mark', 'error'); setSaving(false); return; }
     const { error } = await supabase.from('exam_results').insert(records);
@@ -256,7 +330,7 @@ function ResultModal({ examName, subjects, students, teachers, onClose }: {
         <div className="grid grid-cols-3 gap-3 mb-3">
           <Field label="Subject" required>
             <FieldSelect value={subjectId} onChange={setSubjectId}
-              options={[{ value: '', label: '— Select —' }, ...subjects.map((s: any) => ({ value: s.id, label: s.name }))]} />
+              options={[{ value: '', label: '— Select —' }, ...availableSubjects.map((s: any) => ({ value: s.id, label: s.name }))]} />
           </Field>
           <Field label="Form">
             <FieldSelect value={filterForm} onChange={setFilterForm} options={FORMS.map(f => ({ value: f, label: f }))} />

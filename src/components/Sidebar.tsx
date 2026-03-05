@@ -69,6 +69,7 @@ function navItems(roles: AppRole[]): NavItem[] {
 
   items.push({ sec: 'Info' });
   items.push({ id: 'announcements', ico: 'fas fa-bullhorn', label: 'Announcements' });
+  items.push({ id: 'profile', ico: 'fas fa-user-circle', label: 'My Profile' });
 
   return items;
 }

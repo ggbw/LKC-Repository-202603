@@ -26,9 +26,24 @@ Deno.serve(async (req) => {
     const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: caller.id, _role: 'admin' });
     if (!isAdmin) return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: corsHeaders });
 
-    const { email, password, full_name, role } = await req.json();
+    const body = await req.json();
+    const { action } = body;
 
-    // Create user
+    // Handle password reset
+    if (action === 'reset_password') {
+      const { user_id, new_password } = body;
+      const { error } = await supabase.auth.admin.updateUserById(user_id, { password: new_password });
+      if (error) return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      
+      // Set must_change_password flag
+      await supabase.from('profiles').update({ must_change_password: true }).eq('user_id', user_id);
+      
+      return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Default: create user
+    const { email, password, full_name, role } = body;
+
     const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
       email,
       password,

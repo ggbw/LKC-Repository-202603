@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export function useStudents(form?: string) {
@@ -62,7 +62,7 @@ export function useAttendance(date?: string) {
   return useQuery({
     queryKey: ['attendance', date],
     queryFn: async () => {
-      let q = supabase.from('attendance').select('*, students(full_name, form, enrollment_number)');
+      let q = supabase.from('attendance').select('*, students(full_name, form, enrollment_number, class_name)');
       if (date) q = q.eq('date', date);
       const { data, error } = await q.order('date', { ascending: false });
       if (error) throw error;
@@ -75,7 +75,7 @@ export function useExamResults(examName?: string) {
   return useQuery({
     queryKey: ['exam_results', examName],
     queryFn: async () => {
-      let q = supabase.from('exam_results').select('*, students(full_name, form, enrollment_number), subjects(name, code), teachers(name)');
+      let q = supabase.from('exam_results').select('*, students(full_name, form, enrollment_number, class_name), subjects(name, code), teachers(name)');
       if (examName) q = q.eq('exam_name', examName);
       const { data, error } = await q;
       if (error) throw error;
@@ -203,6 +203,17 @@ export function useStudentSubjects(studentId?: string) {
       let q = supabase.from('student_subjects').select('*, students(full_name, form), subjects(name, code)');
       if (studentId) q = q.eq('student_id', studentId);
       const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    }
+  });
+}
+
+export function useClassTeachers() {
+  return useQuery({
+    queryKey: ['class_teachers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('class_teachers').select('*, teachers(name, code)') as any;
       if (error) throw error;
       return data || [];
     }
