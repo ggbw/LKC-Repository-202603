@@ -36,9 +36,15 @@ export default function ExamsPage() {
         <div><div className="text-lg font-bold"><i className="fas fa-clipboard-list mr-2" />Examinations</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{exams.length} exam periods</div></div>
         <div className="flex gap-2">
           <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
-          {(isAdmin || isHOD || isTeacher) && <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />New Exam</Btn>}
+          {(isAdmin || isHOD || isTeacher) && <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />Create Exam</Btn>}
         </div>
       </div>
+
+      {isTeacher && !isAdmin && !isHOD && (
+        <div className="rounded-md px-4 py-3 mb-4 text-[12px]" style={{ background: '#ddf4ff', border: '1px solid #addcff', color: '#0969da' }}>
+          <i className="fas fa-info-circle mr-1" />You can create exams and enter results for your assigned subjects. Click "Create Exam" to get started, then open the exam to add results.
+        </div>
+      )}
 
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))' }}>
         <StatCard icon="fas fa-clipboard-list" bg="#ddf4ff" value={exams.length} label="Total Exams" />
@@ -59,7 +65,7 @@ export default function ExamsPage() {
               <div className="text-[11px] mb-0.5" style={{ color: 'hsl(var(--text2))' }}><i className="fas fa-calendar-alt mr-1" />{formatDate(e.start_date)} → {formatDate(e.end_date)}</div>
               <div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}><i className="fas fa-chart-bar mr-1" />{examResults.length} results</div>
               <div className="mt-3 pt-2.5 flex gap-1.5" style={{ borderTop: '1px solid hsl(var(--border))' }}>
-                <Btn variant="primary" size="sm" onClick={() => setDetail(e.id)}><i className="fas fa-eye mr-1" />View</Btn>
+                <Btn variant="primary" size="sm" onClick={() => setDetail(e.id)}><i className="fas fa-eye mr-1" />View & Enter Results</Btn>
                 {(isAdmin || isHOD) && e.state === 'draft' && (
                   <Btn variant="outline" size="sm" onClick={async () => {
                     await supabase.from('exams').update({ state: 'confirmed' }).eq('id', e.id);
