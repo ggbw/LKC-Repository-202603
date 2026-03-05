@@ -17,17 +17,24 @@ export default function AssignmentsPage() {
   const { data: teachers = [] } = useTeachers();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: students = [] } = useStudents();
+  const { data: studentSubjects = [] } = useStudentSubjects();
   const invalidate = useInvalidate();
   const [modal, setModal] = useState(false);
   const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
+  const myStudent = students.find((s: any) => s.user_id === user?.id);
 
-  // Filter assignments: teachers only see their own
+  // Filter assignments: teachers see own, students see only published + matching their subjects/form
   const visibleAssignments = useMemo(() => {
     if (isAdmin) return assignments;
     if (isTeacher && myTeacher) return assignments.filter((a: any) => a.teacher_id === myTeacher.id);
-    if (isStudent) return assignments.filter((a: any) => a.state === 'published');
+    if (isStudent && myStudent) {
+      const mySubjectIds = studentSubjects.filter((ss: any) => ss.student_id === myStudent.id).map((ss: any) => ss.subject_id);
+      return assignments.filter((a: any) =>
+        a.state === 'published' && a.form === myStudent.form && (a.subject_id ? mySubjectIds.includes(a.subject_id) : true)
+      );
+    }
     return assignments.filter((a: any) => a.state === 'published');
-  }, [assignments, isAdmin, isTeacher, isStudent, myTeacher]);
+  }, [assignments, isAdmin, isTeacher, isStudent, myTeacher, myStudent, studentSubjects]);
 
   if (detail) return <AssignmentDetail id={detail} onBack={() => setDetail(null)} />;
 
@@ -92,12 +99,13 @@ export default function AssignmentsPage() {
                               showToast('Published!');
                             }}><i className="fas fa-globe mr-1" />Publish</Btn>
                           )}
-                          {isAdmin && (
+                          {(a.teacher_id === myTeacher?.id || isAdmin) && (
                             <Btn variant="danger" size="sm" onClick={async (e: any) => {
                               e.stopPropagation();
-                              if (!confirm('Delete?')) return;
+                              if (!confirm('Delete this assignment?')) return;
+                              await supabase.from('submissions').delete().eq('assignment_id', a.id);
                               await supabase.from('assignments').delete().eq('id', a.id);
-                              invalidate(['assignments']);
+                              invalidate(['assignments', 'submissions']);
                               showToast('Deleted');
                             }}><i className="fas fa-trash" /></Btn>
                           )}
@@ -237,7 +245,8 @@ function GradeSubmissionBtn({ submission, totalMarks, onDone }: { submission: an
 
 function SubmitAssignmentModal({ assignment, studentId, onClose }: { assignment: any; studentId: string; onClose: () => void }) {
   const { showToast } = useApp();
-  const [submissionType, setSubmissionType] = useState<'softcopy' | 'hardcopy'>('softcopy');
+  const defaultType = assignment.submission_type === 'text' ? 'hardcopy' : 'softcopy';
+  const [submissionType, setSubmissionType] = useState<'softcopy' | 'hardcopy'>(defaultType);
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -259,12 +268,14 @@ function SubmitAssignmentModal({ assignment, studentId, onClose }: { assignment:
     <Modal onClose={onClose}>
       <ModalHead title={`Submit: ${assignment.title}`} onClose={onClose} />
       <ModalBody>
-        <Field label="Submission Type" required>
-          <FieldSelect value={submissionType} onChange={v => setSubmissionType(v as any)} options={[
-            { value: 'softcopy', label: 'Softcopy (type answer)' },
-            { value: 'hardcopy', label: 'Hardcopy (physical submission)' },
-          ]} />
-        </Field>
+        {assignment.submission_type === 'both' && (
+          <Field label="Submission Type" required>
+            <FieldSelect value={submissionType} onChange={v => setSubmissionType(v as any)} options={[
+              { value: 'softcopy', label: 'Softcopy (type answer)' },
+              { value: 'hardcopy', label: 'Hardcopy (physical submission)' },
+            ]} />
+          </Field>
+        )}
         {submissionType === 'softcopy' && (
           <Field label="Your Answer" required>
             <FieldTextarea value={text} onChange={setText} placeholder="Type your answer here..." minHeight="120px" />
