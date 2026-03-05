@@ -463,16 +463,19 @@ export type Database = {
           id: string
           student_id: string
           subject_id: string
+          teacher_id: string | null
         }
         Insert: {
           id?: string
           student_id: string
           subject_id: string
+          teacher_id?: string | null
         }
         Update: {
           id?: string
           student_id?: string
           subject_id?: string
+          teacher_id?: string | null
         }
         Relationships: [
           {
@@ -487,6 +490,13 @@ export type Database = {
             columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_subjects_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
             referencedColumns: ["id"]
           },
         ]

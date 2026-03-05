@@ -200,7 +200,7 @@ export function useStudentSubjects(studentId?: string) {
   return useQuery({
     queryKey: ['student_subjects', studentId],
     queryFn: async () => {
-      let q = supabase.from('student_subjects').select('*, students(full_name, form), subjects(name, code)');
+      let q = supabase.from('student_subjects').select('*, students(full_name, form), subjects(name, code), teachers(name)');
       if (studentId) q = q.eq('student_id', studentId);
       const { data, error } = await q;
       if (error) throw error;
