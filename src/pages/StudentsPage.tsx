@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { useStudents, useSubjectTeachers, useStudentSubjects, useClassTeachers, useInvalidate } from '@/hooks/useSupabaseData';
+import { useStudents, useTeachers, useSubjectTeachers, useStudentSubjects, useClassTeachers, useInvalidate } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { FORMS, cap, formatDate } from '@/data/database';
 import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
@@ -10,8 +10,12 @@ import { Badge, Card, InfoRow, SearchBar, FilterSelect, Btn, BackBtn,
 
 export default function StudentsPage() {
   const { detail, setDetail, showToast } = useApp();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isTeacher, user } = useAuth();
   const { data: students = [], isLoading } = useStudents();
+  const { data: teachers = [] } = useTeachers();
+  const { data: subjectTeachers = [] } = useSubjectTeachers();
+  const { data: studentSubjects = [] } = useStudentSubjects();
+  const { data: classTeachers = [] } = useClassTeachers();
   const [search, setSearch] = useState('');
   const [filterForm, setFilterForm] = useState('');
   const [filterClass, setFilterClass] = useState('');
@@ -19,9 +23,38 @@ export default function StudentsPage() {
   const [modal, setModal] = useState<string | 'new' | null>(null);
   const invalidate = useInvalidate();
 
+  const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
+
+  // Teachers only see students taking their subjects or in their class teacher classes
+  const visibleStudents = useMemo(() => {
+    if (isAdmin) return students;
+    if (isTeacher && myTeacher) {
+      // Get subject IDs this teacher teaches
+      const mySubjectIds = subjectTeachers
+        .filter((st: any) => st.teacher_id === myTeacher.id)
+        .map((st: any) => st.subject_id);
+      // Get student IDs enrolled in those subjects
+      const subjectStudentIds = new Set(
+        studentSubjects
+          .filter((ss: any) => mySubjectIds.includes(ss.subject_id))
+          .map((ss: any) => ss.student_id)
+      );
+      // Get student IDs from class teacher assignments
+      const myClassAssignments = classTeachers.filter((ct: any) => ct.teacher_id === myTeacher.id);
+      const classStudentIds = new Set(
+        students
+          .filter((s: any) => myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name))
+          .map((s: any) => s.id)
+      );
+      // Union of both sets
+      return students.filter((s: any) => subjectStudentIds.has(s.id) || classStudentIds.has(s.id));
+    }
+    return students;
+  }, [students, isAdmin, isTeacher, myTeacher, subjectTeachers, studentSubjects, classTeachers]);
+
   if (detail) return <StudentDetail id={detail} onBack={() => setDetail(null)} />;
 
-  const rows = students.filter((s: any) =>
+  const rows = visibleStudents.filter((s: any) =>
     (!search || s.full_name.toLowerCase().includes(search.toLowerCase()) || (s.enrollment_number || '').toLowerCase().includes(search.toLowerCase())) &&
     (!filterForm || s.form === filterForm) &&
     (!filterClass || s.class_name === filterClass) &&
@@ -69,7 +102,7 @@ export default function StudentsPage() {
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold"><i className="fas fa-graduation-cap mr-2" />Students</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{students.length} total</div></div>
+        <div><div className="text-lg font-bold"><i className="fas fa-graduation-cap mr-2" />Students</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{visibleStudents.length} total</div></div>
         <div className="flex gap-2">
           <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
           {isAdmin && <Btn variant="outline" onClick={handleImport}><i className="fas fa-upload mr-1" />Import</Btn>}
@@ -79,7 +112,7 @@ export default function StudentsPage() {
       <Card>
         <SearchBar value={search} onChange={setSearch} placeholder="🔍  Search name or enrollment...">
           <FilterSelect value={filterForm} onChange={setFilterForm} allLabel="All Forms" options={FORMS.map(f => ({ value: f, label: f }))} />
-          <FilterSelect value={filterClass} onChange={setFilterClass} allLabel="All Classes" options={[...new Set(students.map((s: any) => s.class_name).filter(Boolean))].sort().map(c => ({ value: c, label: c }))} />
+          <FilterSelect value={filterClass} onChange={setFilterClass} allLabel="All Classes" options={[...new Set(visibleStudents.map((s: any) => s.class_name).filter(Boolean))].sort().map(c => ({ value: c, label: c }))} />
           <FilterSelect value={filterState} onChange={setFilterState} allLabel="All Status" options={['active','suspended','graduated','transferred','inactive'].map(s => ({ value: s, label: cap(s) }))} />
         </SearchBar>
         {rows.length === 0 ? <div className="py-10 text-center text-xs" style={{ color: 'hsl(var(--text3))' }}>No students found</div> : (

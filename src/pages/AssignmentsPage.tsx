@@ -21,15 +21,15 @@ export default function AssignmentsPage() {
   const [modal, setModal] = useState(false);
   const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
 
-  if (detail) return <AssignmentDetail id={detail} onBack={() => setDetail(null)} />;
-
-  // Filter assignments for teachers to their own
+  // Filter assignments: teachers only see their own
   const visibleAssignments = useMemo(() => {
     if (isAdmin) return assignments;
-    if (isTeacher && myTeacher) return assignments.filter((a: any) => a.teacher_id === myTeacher.id || a.state === 'published');
+    if (isTeacher && myTeacher) return assignments.filter((a: any) => a.teacher_id === myTeacher.id);
     if (isStudent) return assignments.filter((a: any) => a.state === 'published');
     return assignments.filter((a: any) => a.state === 'published');
   }, [assignments, isAdmin, isTeacher, isStudent, myTeacher]);
+
+  if (detail) return <AssignmentDetail id={detail} onBack={() => setDetail(null)} />;
 
   const handleExport = () => {
     downloadExcel(visibleAssignments.map((a: any) => ({
