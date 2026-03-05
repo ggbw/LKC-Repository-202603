@@ -252,17 +252,14 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {studentSubjects.length === 0 ? (
               <div className="text-xs" style={{ color: 'hsl(var(--text3))' }}>No subjects assigned</div>
             ) : (
-              studentSubjects.map((ss: any) => {
-                const teacherMappings = subjectTeachers.filter((st: any) => st.subject_id === ss.subject_id);
-                return (
+              studentSubjects.map((ss: any) => (
                   <div key={ss.id} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
                     <span className="font-semibold">{ss.subjects?.name} <span className="font-mono text-[9px]" style={{ color: 'hsl(var(--text3))' }}>{ss.subjects?.code}</span></span>
                     <span className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>
-                      {teacherMappings.map((tm: any) => tm.teachers?.name).filter(Boolean).join(', ') || '—'}
+                      {ss.teachers?.name || '—'}
                     </span>
                   </div>
-                );
-              })
+              ))
             )}
           </Card>
         </div>
