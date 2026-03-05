@@ -35,18 +35,70 @@ Deno.serve(async (req) => {
       const { error } = await supabase.auth.admin.updateUserById(user_id, { password: new_password });
       if (error) return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       
-      // Set must_change_password flag
       await supabase.from('profiles').update({ must_change_password: true }).eq('user_id', user_id);
       
       return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Default: create user
-    const { email, password, full_name, role } = body;
+    // Handle bulk creation
+    if (action === 'bulk_create') {
+      const { users } = body; // Array of { email, full_name, role, link_table?, link_id? }
+      const results: any[] = [];
+
+      for (const u of users) {
+        try {
+          if (!u.email || !u.full_name || !u.role) {
+            results.push({ email: u.email, name: u.full_name, success: false, error: 'Missing required fields' });
+            continue;
+          }
+
+          const password = (u.full_name.split(' ')[0]?.toLowerCase() || 'user') + Math.floor(1000 + Math.random() * 9000);
+
+          const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+            email: u.email,
+            password,
+            email_confirm: true,
+            user_metadata: { full_name: u.full_name },
+          });
+
+          if (createErr) {
+            results.push({ email: u.email, name: u.full_name, success: false, error: createErr.message });
+            continue;
+          }
+
+          const userId = newUser.user!.id;
+
+          // Assign role
+          await supabase.from('user_roles').insert({ user_id: userId, role: u.role });
+
+          // Set must_change_password
+          await supabase.from('profiles').update({ must_change_password: true }).eq('user_id', userId);
+
+          // Link back to source table if specified
+          if (u.link_table && u.link_id) {
+            const validTables = ['teachers', 'students', 'parents'];
+            if (validTables.includes(u.link_table)) {
+              await supabase.from(u.link_table).update({ user_id: userId }).eq('id', u.link_id);
+            }
+          }
+
+          results.push({ email: u.email, name: u.full_name, password, role: u.role, success: true, user_id: userId });
+        } catch (err: any) {
+          results.push({ email: u.email, name: u.full_name, success: false, error: err.message });
+        }
+      }
+
+      return new Response(JSON.stringify({ results }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Default: create single user
+    const { email, password, full_name, role, link_table, link_id } = body;
+
+    const genPassword = password || ((full_name?.split(' ')[0]?.toLowerCase() || 'user') + Math.floor(1000 + Math.random() * 9000));
 
     const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
       email,
-      password,
+      password: genPassword,
       email_confirm: true,
       user_metadata: { full_name },
     });
@@ -61,7 +113,15 @@ Deno.serve(async (req) => {
     // Set must_change_password
     await supabase.from('profiles').update({ must_change_password: true }).eq('user_id', newUser.user!.id);
 
-    return new Response(JSON.stringify({ user_id: newUser.user!.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Link back to source table
+    if (link_table && link_id) {
+      const validTables = ['teachers', 'students', 'parents'];
+      if (validTables.includes(link_table)) {
+        await supabase.from(link_table).update({ user_id: newUser.user!.id }).eq('id', link_id);
+      }
+    }
+
+    return new Response(JSON.stringify({ user_id: newUser.user!.id, password: genPassword }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
