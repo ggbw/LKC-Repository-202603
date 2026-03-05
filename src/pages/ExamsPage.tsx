@@ -10,7 +10,7 @@ import { Badge, Card, StatCard, Btn, BackBtn, GradeChip, FilterSelect,
 
 export default function ExamsPage() {
   const { detail, setDetail, showToast } = useApp();
-  const { isAdmin, isHOD } = useAuth();
+  const { isAdmin, isHOD, isTeacher } = useAuth();
   const { data: exams = [], isLoading } = useExams();
   const { data: results = [] } = useExamResults();
   const invalidate = useInvalidate();
@@ -36,7 +36,7 @@ export default function ExamsPage() {
         <div><div className="text-lg font-bold"><i className="fas fa-clipboard-list mr-2" />Examinations</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{exams.length} exam periods</div></div>
         <div className="flex gap-2">
           <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
-          {(isAdmin || isHOD) && <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />New Exam</Btn>}
+          {(isAdmin || isHOD || isTeacher) && <Btn onClick={() => setModal(true)}><i className="fas fa-plus mr-1" />New Exam</Btn>}
         </div>
       </div>
 
@@ -94,6 +94,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: students = [] } = useStudents();
   const { data: teachers = [] } = useTeachers();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
+  const { data: studentSubjects = [] } = useStudentSubjects();
   const invalidate = useInvalidate();
   const exam = exams.find((e: any) => e.id === id) as any;
   const { data: results = [] } = useExamResults(exam?.name);
@@ -142,9 +143,9 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
       </div>
 
       <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-        <StatCard icon="fas fa-chart-bar" bg="#ddf4ff" value={results.length} label="Results" />
-        <StatCard icon="fas fa-graduation-cap" bg="#dafbe1" value={[...new Set(results.map((r: any) => r.student_id))].length} label="Students" />
-        <StatCard icon="fas fa-book" bg="#fbefff" value={subjectsInResults.length} label="Subjects" />
+        <StatCard icon="fas fa-chart-bar" bg="#ddf4ff" value={filtResults.length} label="Results" />
+        <StatCard icon="fas fa-graduation-cap" bg="#dafbe1" value={[...new Set(filtResults.map((r: any) => r.student_id))].length} label="Students" />
+        <StatCard icon="fas fa-book" bg="#fbefff" value={[...new Set(filtResults.map((r: any) => r.subject_id))].length} label="Subjects" />
       </div>
 
       <Card title={`Results (${filtResults.length})`} titleRight={
@@ -196,7 +197,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
       </Card>
 
       {resultModal && <ResultModal examName={exam.name} examForm={exam.form} subjects={subjects} students={students} teachers={teachers}
-        subjectTeachers={subjectTeachers}
+        subjectTeachers={subjectTeachers} studentSubjects={studentSubjects}
         onClose={() => { setResultModal(false); invalidate(['exam_results']); }} />}
 
       {commentModal && <CommentModal result={commentModal} onClose={() => { setCommentModal(null); invalidate(['exam_results']); }} />}
@@ -281,8 +282,8 @@ function ExamModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ResultModal({ examName, examForm, subjects, students, teachers, subjectTeachers, onClose }: {
-  examName: string; examForm: string; subjects: any[]; students: any[]; teachers: any[]; subjectTeachers: any[]; onClose: () => void;
+function ResultModal({ examName, examForm, subjects, students, teachers, subjectTeachers, studentSubjects, onClose }: {
+  examName: string; examForm: string; subjects: any[]; students: any[]; teachers: any[]; subjectTeachers: any[]; studentSubjects: any[]; onClose: () => void;
 }) {
   const { showToast } = useApp();
   const { user, isAdmin, isHOD } = useAuth();
@@ -304,7 +305,18 @@ function ResultModal({ examName, examForm, subjects, students, teachers, subject
     return subjects;
   }, [subjects, subjectTeachers, myTeacher, isAdmin, isHOD]);
 
-  const formStudents = students.filter((s: any) => s.form === filterForm && s.state === 'active');
+  // Only show students taking the selected subject
+  const formStudents = useMemo(() => {
+    const formFiltered = students.filter((s: any) => s.form === filterForm && s.state === 'active');
+    if (!subjectId) return formFiltered;
+    // Filter to only students enrolled in the selected subject
+    const enrolledStudentIds = new Set(
+      studentSubjects.filter((ss: any) => ss.subject_id === subjectId).map((ss: any) => ss.student_id)
+    );
+    // If no student_subjects mappings exist yet, show all students in form
+    if (enrolledStudentIds.size === 0) return formFiltered;
+    return formFiltered.filter((s: any) => enrolledStudentIds.has(s.id));
+  }, [students, filterForm, subjectId, studentSubjects]);
 
   const save = async () => {
     if (!subjectId) return;
@@ -338,33 +350,38 @@ function ResultModal({ examName, examForm, subjects, students, teachers, subject
           <Field label="Max Marks"><FieldInput value={maxMarks} onChange={setMaxMarks} type="number" /></Field>
         </div>
         {subjectId && formStudents.length > 0 && (
-          <div className="overflow-y-auto" style={{ maxHeight: '350px' }}>
-            <table className="w-full border-collapse text-[12.5px]">
-              <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-                {['Student','Enrollment','Marks'].map(h => (
-                  <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
-                ))}
-              </tr></thead>
-              <tbody>
-                {formStudents.map((s: any) => (
-                  <tr key={s.id} style={{ borderBottom: '1px solid #f6f8fa' }}>
-                    <td className="py-2 px-3.5 font-semibold">{s.full_name}</td>
-                    <td className="py-2 px-3.5 font-mono text-[11px]">{s.enrollment_number || '—'}</td>
-                    <td className="py-2 px-3.5">
-                      <input type="number" min="0" max={maxMarks} value={marks[s.id] || ''}
-                        onChange={e => setMarks(m => ({ ...m, [s.id]: e.target.value }))}
-                        className="w-20 border rounded py-1 px-2 text-[12px] font-mono outline-none"
-                        style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--surface2))' }}
-                        placeholder="—" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="text-[11px] mb-2" style={{ color: 'hsl(var(--text2))' }}>
+              Showing {formStudents.length} students enrolled in this subject for {filterForm}
+            </div>
+            <div className="overflow-y-auto" style={{ maxHeight: '350px' }}>
+              <table className="w-full border-collapse text-[12.5px]">
+                <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
+                  {['Student','Enrollment','Marks'].map(h => (
+                    <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {formStudents.map((s: any) => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid #f6f8fa' }}>
+                      <td className="py-2 px-3.5 font-semibold">{s.full_name}</td>
+                      <td className="py-2 px-3.5 font-mono text-[11px]">{s.enrollment_number || '—'}</td>
+                      <td className="py-2 px-3.5">
+                        <input type="number" min="0" max={maxMarks} value={marks[s.id] || ''}
+                          onChange={e => setMarks(m => ({ ...m, [s.id]: e.target.value }))}
+                          className="w-20 border rounded py-1 px-2 text-[12px] font-mono outline-none"
+                          style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--surface2))' }}
+                          placeholder="—" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         {subjectId && formStudents.length === 0 && (
-          <div className="text-xs py-4 text-center" style={{ color: 'hsl(var(--text3))' }}>No active students in {filterForm}</div>
+          <div className="text-xs py-4 text-center" style={{ color: 'hsl(var(--text3))' }}>No students enrolled in this subject for {filterForm}</div>
         )}
       </ModalBody>
       <ModalFoot>
