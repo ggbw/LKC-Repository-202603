@@ -1,0 +1,1 @@
+ALTER TABLE public.student_subjects ADD COLUMN teacher_id uuid REFERENCES public.teachers(id) ON DELETE SET NULL DEFAULT NULL;

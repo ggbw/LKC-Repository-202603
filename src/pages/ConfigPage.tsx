@@ -186,7 +186,7 @@ function SubjectStudentTab({ studentSubjects, subjects, students, isAdmin, showT
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
             <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Subject', 'Student', 'Form', 'Actions'].map(h => (
+              {['Subject', 'Student', 'Form', 'Teacher', 'Actions'].map(h => (
                 <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
               ))}
             </tr></thead>
@@ -196,6 +196,7 @@ function SubjectStudentTab({ studentSubjects, subjects, students, isAdmin, showT
                   <td className="py-2.5 px-3.5 font-semibold">{ss.subjects?.name}</td>
                   <td className="py-2.5 px-3.5">{ss.students?.full_name}</td>
                   <td className="py-2.5 px-3.5 text-[11px]">{ss.students?.form}</td>
+                  <td className="py-2.5 px-3.5 text-[11px]">{ss.teachers?.name || '—'}</td>
                   <td className="py-2.5 px-3.5">
                     {isAdmin && <Btn variant="danger" size="sm" onClick={async () => {
                       await supabase.from('student_subjects').delete().eq('id', ss.id);
@@ -354,6 +355,7 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
   const { data: subjectTeachersAll = [] } = useSubjectTeachers();
   const { data: existingStudentSubjects = [] } = useStudentSubjects();
   const [subjectId, setSubjectId] = useState('');
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [filterForm, setFilterForm] = useState('Form 1');
   const [filterClass, setFilterClass] = useState('');
   const [searchStr, setSearchStr] = useState('');
@@ -408,7 +410,7 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
   const save = async () => {
     if (!subjectId || selectedIds.length === 0) return;
     setSaving(true);
-    const records = selectedIds.map(sid => ({ subject_id: subjectId, student_id: sid }));
+    const records = selectedIds.map(sid => ({ subject_id: subjectId, student_id: sid, teacher_id: selectedTeacherId || null }));
     for (let i = 0; i < records.length; i += 50) {
       const batch = records.slice(i, i + 50);
       const { error } = await supabase.from('student_subjects').insert(batch);
@@ -429,36 +431,32 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
           <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
             <i className="fas fa-book mr-1.5" />Step 1 — Select Subject
           </div>
-          <FieldSelect value={subjectId} onChange={v => { setSubjectId(v); setSelectedIds([]); }}
+          <FieldSelect value={subjectId} onChange={v => { setSubjectId(v); setSelectedTeacherId(''); setSelectedIds([]); }}
             options={[{ value: '', label: '— Select Subject —' }, ...subjects.map((s: any) => ({ value: s.id, label: `${s.name} (${s.code || ''})` }))]} />
         </div>
 
-        {/* Dynamic Teacher Match */}
+        {/* Step 2: Select Teacher */}
         {subjectId && (
-          <div className="mb-4 p-3 rounded-lg" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>
-            <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: 'hsl(var(--text2))' }}>
-              <i className="fas fa-chalkboard-teacher mr-1.5" />Teachers for {selectedSubject?.name}
+          <div className="mb-4">
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
+              <i className="fas fa-chalkboard-teacher mr-1.5" />Step 2 — Select Teacher for {selectedSubject?.name}
             </div>
             {matchedTeachers.length === 0 ? (
-              <div className="text-[11px]" style={{ color: 'hsl(var(--text3))' }}>No teachers assigned to this subject yet.</div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {matchedTeachers.map((t: any, i: number) => (
-                  <span key={i} className="rounded-[5px] px-2.5 py-1 text-[11px] font-semibold" style={{ background: '#ddf4ff', color: '#0969da' }}>
-                    <i className="fas fa-user mr-1" />{t.name}
-                    {t.department && <span className="font-normal ml-1 text-[9px]" style={{ color: '#0969da99' }}>({t.department})</span>}
-                  </span>
-                ))}
+              <div className="text-[11px] p-3 rounded-lg" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text3))' }}>
+                No teachers assigned to this subject yet. Map a teacher in Subject → Teacher first.
               </div>
+            ) : (
+              <FieldSelect value={selectedTeacherId} onChange={setSelectedTeacherId}
+                options={[{ value: '', label: '— Select Teacher —' }, ...matchedTeachers.map((t: any) => ({ value: t.id, label: `${t.name}${t.department ? ` (${t.department})` : ''}` }))]} />
             )}
           </div>
         )}
 
         {/* Step 2: Select Students */}
-        {subjectId && (
+        {subjectId && selectedTeacherId && (
           <>
             <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
-              <i className="fas fa-users mr-1.5" />Step 2 — Select Students
+              <i className="fas fa-users mr-1.5" />Step 3 — Select Students
             </div>
             <div className="flex gap-2 mb-3">
               <FieldSelect value={filterForm} onChange={v => { setFilterForm(v); setFilterClass(''); setSelectedIds([]); }}
