@@ -367,8 +367,8 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
     if (!subjectId) return [];
     return subjectTeachersAll
       .filter((st: any) => st.subject_id === subjectId)
-      .map((st: any) => st.teachers)
-      .filter(Boolean);
+      .map((st: any) => ({ id: st.teacher_id, name: st.teachers?.name, department: st.teachers?.department }))
+      .filter((t: any) => t.name);
   }, [subjectId, subjectTeachersAll]);
 
   // Students already mapped to this subject
