@@ -1,0 +1,1 @@
+ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS class_name TEXT;
