@@ -367,8 +367,18 @@ function AssignmentDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <div>
               Status: <Badge status={mySubmission.status || "submitted"} />
             </div>
-            {mySubmission.submission_text && (
-              <div className="mt-2 whitespace-pre-wrap">{mySubmission.submission_text}</div>
+            {mySubmission.submission_file && (
+              <a
+                href={mySubmission.submission_file}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 flex items-center gap-2 rounded-lg px-3 py-2.5 no-underline"
+                style={{ background: "#dafbe1", border: "1px solid #aceebb", color: "#1a7f37", display: "flex" }}
+              >
+                <i className="fas fa-file-alt" />
+                <span className="text-[12px] font-semibold">View submitted document</span>
+                <i className="fas fa-external-link-alt text-[10px] ml-auto" />
+              </a>
             )}
             {mySubmission.obtained_marks !== null && (
               <div className="mt-2 font-bold">
@@ -408,7 +418,25 @@ function AssignmentDetail({ id, onBack }: { id: string; onBack: () => void }) {
                   <tr key={s.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
                     <td className="py-2.5 px-3.5 font-semibold">{s.students?.full_name || "—"}</td>
                     <td className="py-2.5 px-3.5 font-mono text-[11px]">{formatDateTime(s.submitted_at)}</td>
-                    <td className="py-2.5 px-3.5 text-[11px]">{s.submission_text ? "Softcopy" : "Hardcopy"}</td>
+                    <td className="py-2.5 px-3.5 text-[11px]">
+                      {s.submission_file ? (
+                        <a
+                          href={s.submission_file}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-semibold no-underline"
+                          style={{ color: "#1a7f37" }}
+                        >
+                          <i className="fas fa-file-alt" />
+                          Softcopy
+                          <i className="fas fa-external-link-alt text-[9px]" />
+                        </a>
+                      ) : s.submission_text ? (
+                        "Softcopy"
+                      ) : (
+                        "Hardcopy"
+                      )}
+                    </td>
                     <td className="py-2.5 px-3.5 font-mono">
                       {s.obtained_marks !== null ? `${s.obtained_marks}/${a.total_marks || "?"}` : "—"}
                     </td>
@@ -523,29 +551,76 @@ function SubmitAssignmentModal({
   onClose: () => void;
 }) {
   const { showToast } = useApp();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Derive the forced type from the teacher's setting:
-  // 'file' = softcopy only, 'text' = hardcopy only, 'both' = student chooses
+  // 'file' = softcopy (upload doc) only, 'text' = hardcopy only, 'both' = student chooses
   const forcedType: "softcopy" | "hardcopy" | null =
     assignment.submission_type === "file" ? "softcopy" : assignment.submission_type === "text" ? "hardcopy" : null; // 'both' — student picks
 
   const [submissionType, setSubmissionType] = useState<"softcopy" | "hardcopy">(forcedType ?? "softcopy");
-  const [text, setText] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const save = async () => {
-    if (submissionType === "softcopy" && !text.trim()) {
-      showToast("Please type your answer before submitting", "error");
+  const allowedTypes = ".pdf, .doc, .docx, .ppt, .pptx, .xls, .xlsx, .txt, .zip, .png, .jpg, .jpeg";
+  const MAX_MB = 10;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      showToast(`File too large — max ${MAX_MB}MB`, "error");
       return;
     }
+    setUploadedFile(file);
+  };
+
+  const removeFile = () => {
+    setUploadedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const save = async () => {
+    // Validation
+    if (submissionType === "softcopy" && !uploadedFile) {
+      showToast("Please attach a document before submitting", "error");
+      return;
+    }
+
     setSaving(true);
+    let fileUrl: string | null = null;
+
+    // Upload file to storage if softcopy
+    if (submissionType === "softcopy" && uploadedFile) {
+      setUploading(true);
+      const ext = uploadedFile.name.split(".").pop();
+      const filePath = `submissions/${assignment.id}/${studentId}_${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("submission-files")
+        .upload(filePath, uploadedFile, { upsert: false });
+
+      if (uploadError) {
+        showToast(`Upload failed: ${uploadError.message}`, "error");
+        setSaving(false);
+        setUploading(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("submission-files").getPublicUrl(filePath);
+      fileUrl = urlData?.publicUrl || null;
+      setUploading(false);
+    }
+
     const { error } = await supabase.from("submissions").insert({
       assignment_id: assignment.id,
       student_id: studentId,
-      submission_text: submissionType === "softcopy" ? text : "[Hardcopy submission]",
+      submission_text: submissionType === "softcopy" ? `[File: ${uploadedFile?.name}]` : null,
+      submission_file: fileUrl,
       status: "submitted",
       is_late: assignment.due_date ? new Date() > new Date(assignment.due_date) : false,
     });
+
     if (error) {
       showToast(error.message, "error");
       setSaving(false);
@@ -559,18 +634,66 @@ function SubmitAssignmentModal({
     <Modal onClose={onClose}>
       <ModalHead title={`Submit: ${assignment.title}`} onClose={onClose} />
       <ModalBody>
-        {/* ── Softcopy only ── */}
+        {/* ── Softcopy only — file upload ── */}
         {forcedType === "softcopy" && (
           <>
             <div
               className="rounded-md px-3 py-2 mb-3 text-[11px]"
               style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}
             >
-              <i className="fas fa-laptop mr-1" />
-              This assignment requires a <strong>softcopy submission</strong> — type your answer below.
+              <i className="fas fa-upload mr-1" />
+              This assignment requires a <strong>softcopy (document) submission</strong> — upload your file below.
             </div>
-            <Field label="Your Answer" required>
-              <FieldTextarea value={text} onChange={setText} placeholder="Type your answer here..." minHeight="140px" />
+            <Field label="Upload Document" required>
+              {!uploadedFile ? (
+                <div
+                  className="rounded-lg border-2 border-dashed flex flex-col items-center justify-center py-8 cursor-pointer transition-colors"
+                  style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface2))" }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <i className="fas fa-cloud-upload-alt text-2xl mb-2" style={{ color: "hsl(var(--text3))" }} />
+                  <div className="text-[12px] font-semibold" style={{ color: "hsl(var(--text2))" }}>
+                    Click to browse
+                  </div>
+                  <div className="text-[10px] mt-1" style={{ color: "hsl(var(--text3))" }}>
+                    {allowedTypes}
+                  </div>
+                  <div className="text-[10px]" style={{ color: "hsl(var(--text3))" }}>
+                    Max {MAX_MB}MB
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept={allowedTypes}
+                    onChange={handleFileChange}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="rounded-lg px-4 py-3 flex items-center justify-between"
+                  style={{ background: "#dafbe1", border: "1px solid #aceebb" }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <i className="fas fa-file-alt text-lg flex-shrink-0" style={{ color: "#2ea043" }} />
+                    <div className="min-w-0">
+                      <div className="text-[12.5px] font-semibold truncate" style={{ color: "#1a7f37" }}>
+                        {uploadedFile.name}
+                      </div>
+                      <div className="text-[10px]" style={{ color: "#2ea043" }}>
+                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB — ready to submit
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={removeFile}
+                    className="ml-3 flex-shrink-0 text-[13px] font-bold cursor-pointer"
+                    style={{ color: "#cf222e", background: "none", border: "none" }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                </div>
+              )}
             </Field>
           </>
         )}
@@ -598,21 +721,67 @@ function SubmitAssignmentModal({
             <Field label="Submission Type" required>
               <FieldSelect
                 value={submissionType}
-                onChange={(v) => setSubmissionType(v as any)}
+                onChange={(v) => {
+                  setSubmissionType(v as any);
+                  setUploadedFile(null);
+                }}
                 options={[
-                  { value: "softcopy", label: "Softcopy (type answer here)" },
+                  { value: "softcopy", label: "Softcopy (upload document)" },
                   { value: "hardcopy", label: "Hardcopy (physical submission)" },
                 ]}
               />
             </Field>
             {submissionType === "softcopy" && (
-              <Field label="Your Answer" required>
-                <FieldTextarea
-                  value={text}
-                  onChange={setText}
-                  placeholder="Type your answer here..."
-                  minHeight="120px"
-                />
+              <Field label="Upload Document" required>
+                {!uploadedFile ? (
+                  <div
+                    className="rounded-lg border-2 border-dashed flex flex-col items-center justify-center py-8 cursor-pointer"
+                    style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface2))" }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <i className="fas fa-cloud-upload-alt text-2xl mb-2" style={{ color: "hsl(var(--text3))" }} />
+                    <div className="text-[12px] font-semibold" style={{ color: "hsl(var(--text2))" }}>
+                      Click to browse
+                    </div>
+                    <div className="text-[10px] mt-1" style={{ color: "hsl(var(--text3))" }}>
+                      {allowedTypes}
+                    </div>
+                    <div className="text-[10px]" style={{ color: "hsl(var(--text3))" }}>
+                      Max {MAX_MB}MB
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept={allowedTypes}
+                      onChange={handleFileChange}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="rounded-lg px-4 py-3 flex items-center justify-between"
+                    style={{ background: "#dafbe1", border: "1px solid #aceebb" }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <i className="fas fa-file-alt text-lg flex-shrink-0" style={{ color: "#2ea043" }} />
+                      <div className="min-w-0">
+                        <div className="text-[12.5px] font-semibold truncate" style={{ color: "#1a7f37" }}>
+                          {uploadedFile.name}
+                        </div>
+                        <div className="text-[10px]" style={{ color: "#2ea043" }}>
+                          {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB — ready to submit
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={removeFile}
+                      className="ml-3 flex-shrink-0 text-[13px] font-bold cursor-pointer"
+                      style={{ color: "#cf222e", background: "none", border: "none" }}
+                    >
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+                )}
               </Field>
             )}
             {submissionType === "hardcopy" && (
@@ -631,8 +800,8 @@ function SubmitAssignmentModal({
         <Btn variant="outline" onClick={onClose}>
           Cancel
         </Btn>
-        <Btn onClick={save} disabled={saving}>
-          {saving ? "Submitting…" : "Submit"}
+        <Btn onClick={save} disabled={saving || uploading}>
+          {uploading ? "Uploading…" : saving ? "Submitting…" : "Submit"}
         </Btn>
       </ModalFoot>
     </Modal>
