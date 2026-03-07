@@ -523,17 +523,26 @@ function SubmitAssignmentModal({
   onClose: () => void;
 }) {
   const { showToast } = useApp();
-  const defaultType = assignment.submission_type === "text" ? "hardcopy" : "softcopy";
-  const [submissionType, setSubmissionType] = useState<"softcopy" | "hardcopy">(defaultType);
+
+  // Derive the forced type from the teacher's setting:
+  // 'file' = softcopy only, 'text' = hardcopy only, 'both' = student chooses
+  const forcedType: "softcopy" | "hardcopy" | null =
+    assignment.submission_type === "file" ? "softcopy" : assignment.submission_type === "text" ? "hardcopy" : null; // 'both' — student picks
+
+  const [submissionType, setSubmissionType] = useState<"softcopy" | "hardcopy">(forcedType ?? "softcopy");
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
+    if (submissionType === "softcopy" && !text.trim()) {
+      showToast("Please type your answer before submitting", "error");
+      return;
+    }
     setSaving(true);
     const { error } = await supabase.from("submissions").insert({
       assignment_id: assignment.id,
       student_id: studentId,
-      submission_text: submissionType === "softcopy" ? text : `[Hardcopy submission]`,
+      submission_text: submissionType === "softcopy" ? text : "[Hardcopy submission]",
       status: "submitted",
       is_late: assignment.due_date ? new Date() > new Date(assignment.due_date) : false,
     });
@@ -550,30 +559,72 @@ function SubmitAssignmentModal({
     <Modal onClose={onClose}>
       <ModalHead title={`Submit: ${assignment.title}`} onClose={onClose} />
       <ModalBody>
-        {assignment.submission_type === "both" && (
-          <Field label="Submission Type" required>
-            <FieldSelect
-              value={submissionType}
-              onChange={(v) => setSubmissionType(v as any)}
-              options={[
-                { value: "softcopy", label: "Softcopy (type answer)" },
-                { value: "hardcopy", label: "Hardcopy (physical submission)" },
-              ]}
-            />
-          </Field>
+        {/* ── Softcopy only ── */}
+        {forcedType === "softcopy" && (
+          <>
+            <div
+              className="rounded-md px-3 py-2 mb-3 text-[11px]"
+              style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}
+            >
+              <i className="fas fa-laptop mr-1" />
+              This assignment requires a <strong>softcopy submission</strong> — type your answer below.
+            </div>
+            <Field label="Your Answer" required>
+              <FieldTextarea value={text} onChange={setText} placeholder="Type your answer here..." minHeight="140px" />
+            </Field>
+          </>
         )}
-        {submissionType === "softcopy" && (
-          <Field label="Your Answer" required>
-            <FieldTextarea value={text} onChange={setText} placeholder="Type your answer here..." minHeight="120px" />
-          </Field>
-        )}
-        {submissionType === "hardcopy" && (
+
+        {/* ── Hardcopy only ── */}
+        {forcedType === "hardcopy" && (
           <div
-            className="rounded-md px-3 py-2 text-[11px]"
+            className="rounded-md px-4 py-4 text-[12px]"
             style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}
           >
-            ℹ Submit the physical copy to your teacher. This records that you intend to submit a hardcopy.
+            <div className="font-semibold mb-1">
+              <i className="fas fa-print mr-1.5" />
+              Hardcopy Submission Required
+            </div>
+            <div className="text-[11px]" style={{ color: "#0969da", opacity: 0.85 }}>
+              Your teacher requires a physical copy. Hand it in directly to your teacher. Clicking Submit records that
+              you intend to submit a hardcopy.
+            </div>
           </div>
+        )}
+
+        {/* ── Student chooses (both) ── */}
+        {forcedType === null && (
+          <>
+            <Field label="Submission Type" required>
+              <FieldSelect
+                value={submissionType}
+                onChange={(v) => setSubmissionType(v as any)}
+                options={[
+                  { value: "softcopy", label: "Softcopy (type answer here)" },
+                  { value: "hardcopy", label: "Hardcopy (physical submission)" },
+                ]}
+              />
+            </Field>
+            {submissionType === "softcopy" && (
+              <Field label="Your Answer" required>
+                <FieldTextarea
+                  value={text}
+                  onChange={setText}
+                  placeholder="Type your answer here..."
+                  minHeight="120px"
+                />
+              </Field>
+            )}
+            {submissionType === "hardcopy" && (
+              <div
+                className="rounded-md px-3 py-2 text-[11px]"
+                style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}
+              >
+                <i className="fas fa-print mr-1" />
+                Hand the physical copy to your teacher. This records your intent to submit a hardcopy.
+              </div>
+            )}
+          </>
         )}
       </ModalBody>
       <ModalFoot>
