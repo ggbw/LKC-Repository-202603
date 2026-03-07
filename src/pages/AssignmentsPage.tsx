@@ -58,6 +58,8 @@ export default function AssignmentsPage() {
         (a: any) =>
           a.state === "published" &&
           a.form === myStudent.form &&
+          // If assignment has a class_name set, only show to students in that class
+          (a.class_name ? a.class_name === myStudent.class_name : true) &&
           (a.subject_id ? mySubjectIds.includes(a.subject_id) : true),
       );
     }
@@ -135,6 +137,7 @@ export default function AssignmentsPage() {
                   "Title",
                   "Subject",
                   "Form",
+                  "Class",
                   "Due Date",
                   "Type",
                   "Status",
@@ -171,6 +174,18 @@ export default function AssignmentsPage() {
                     </td>
                     <td className="py-2.5 px-3.5 text-[11px]">{a.subjects?.name || "—"}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">{a.form}</td>
+                    <td className="py-2.5 px-3.5 text-[11px]">
+                      {a.class_name ? (
+                        <span
+                          className="px-1.5 py-0.5 rounded font-medium"
+                          style={{ background: "#ddf4ff", color: "#0969da", fontSize: "10px" }}
+                        >
+                          {a.class_name}
+                        </span>
+                      ) : (
+                        <span style={{ color: "hsl(var(--text3))" }}>All</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-3.5 font-mono text-[11px]">{formatDate(a.due_date)}</td>
                     <td className="py-2.5 px-3.5">
                       <Badge status={a.submission_type || "file"} />
@@ -279,6 +294,7 @@ function AssignmentDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <Badge status={a.submission_type || "file"} />
             <span className="text-[11px]" style={{ color: "hsl(var(--text2))" }}>
               {a.subjects?.name} · {a.form}
+              {a.class_name ? ` · ${a.class_name}` : ""}
             </span>
           </div>
           <div className="text-xs mt-1" style={{ color: "hsl(var(--text2))" }}>
@@ -580,6 +596,7 @@ function AssignmentModal({
   const { user, isAdmin } = useAuth();
   const [title, setTitle] = useState("");
   const [form, setForm] = useState("Form 1");
+  const [className, setClassName] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [desc, setDesc] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -593,6 +610,23 @@ function AssignmentModal({
   const [uploading, setUploading] = useState(false);
 
   const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
+
+  // Derive available classes for the selected form (read from students table)
+  const { data: allStudents = [] } = useStudents();
+  const availableClasses = useMemo(() => {
+    const names = [
+      ...new Set(
+        allStudents.filter((s: any) => s.form === form && s.class_name).map((s: any) => s.class_name as string),
+      ),
+    ].sort();
+    return names;
+  }, [allStudents, form]);
+
+  // Reset class when form changes
+  const handleFormChange = (newForm: string) => {
+    setForm(newForm);
+    setClassName("");
+  };
 
   // Only show teacher's assigned subjects
   const availableSubjects = useMemo(() => {
@@ -658,6 +692,7 @@ function AssignmentModal({
     const { error } = await supabase.from("assignments").insert({
       title,
       form,
+      class_name: className || null,
       subject_id: subjectId || null,
       description: desc,
       due_date: dueDate || null,
@@ -691,19 +726,61 @@ function AssignmentModal({
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="Form">
-            <FieldSelect value={form} onChange={setForm} options={FORMS.map((f) => ({ value: f, label: f }))} />
-          </Field>
-          <Field label="Subject">
             <FieldSelect
-              value={subjectId}
-              onChange={setSubjectId}
-              options={[
-                { value: "", label: "— Select —" },
-                ...availableSubjects.map((s: any) => ({ value: s.id, label: s.name })),
-              ]}
+              value={form}
+              onChange={handleFormChange}
+              options={FORMS.map((f) => ({ value: f, label: f }))}
             />
           </Field>
+          <Field label="Class">
+            {availableClasses.length === 0 ? (
+              <div
+                className="rounded-md px-3 py-2 text-[11px]"
+                style={{
+                  background: "hsl(var(--surface2))",
+                  border: "1px solid hsl(var(--border))",
+                  color: "hsl(var(--text3))",
+                }}
+              >
+                No classes found for {form}
+              </div>
+            ) : (
+              <FieldSelect
+                value={className}
+                onChange={setClassName}
+                options={[
+                  { value: "", label: "All Classes" },
+                  ...availableClasses.map((c) => ({ value: c, label: c })),
+                ]}
+              />
+            )}
+          </Field>
         </div>
+
+        {className && (
+          <div
+            className="rounded-md px-3 py-2 mb-1 text-[11px]"
+            style={{ background: "#dafbe1", border: "1px solid #aceebb", color: "#1a7f37" }}
+          >
+            <i className="fas fa-users mr-1" />
+            This assignment will only be visible to{" "}
+            <strong>
+              {form} — {className}
+            </strong>{" "}
+            students.
+          </div>
+        )}
+
+        <Field label="Subject">
+          <FieldSelect
+            value={subjectId}
+            onChange={setSubjectId}
+            options={[
+              { value: "", label: "— Select —" },
+              ...availableSubjects.map((s: any) => ({ value: s.id, label: s.name })),
+            ]}
+          />
+        </Field>
 
         <Field label="Description">
           <FieldTextarea value={desc} onChange={setDesc} placeholder="Assignment instructions..." />
