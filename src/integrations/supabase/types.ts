@@ -98,6 +98,8 @@ export type Database = {
       assignments: {
         Row: {
           allow_late: boolean | null
+          attachment_name: string | null
+          attachment_url: string | null
           created_at: string | null
           description: string | null
           due_date: string | null
@@ -112,6 +114,8 @@ export type Database = {
         }
         Insert: {
           allow_late?: boolean | null
+          attachment_name?: string | null
+          attachment_url?: string | null
           created_at?: string | null
           description?: string | null
           due_date?: string | null
@@ -126,6 +130,8 @@ export type Database = {
         }
         Update: {
           allow_late?: boolean | null
+          attachment_name?: string | null
+          attachment_url?: string | null
           created_at?: string | null
           description?: string | null
           due_date?: string | null
