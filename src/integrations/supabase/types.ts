@@ -285,6 +285,7 @@ export type Database = {
       }
       exams: {
         Row: {
+          class_name: string | null
           created_at: string | null
           end_date: string | null
           form: string
@@ -294,6 +295,7 @@ export type Database = {
           state: string | null
         }
         Insert: {
+          class_name?: string | null
           created_at?: string | null
           end_date?: string | null
           form?: string
@@ -303,6 +305,7 @@ export type Database = {
           state?: string | null
         }
         Update: {
+          class_name?: string | null
           created_at?: string | null
           end_date?: string | null
           form?: string
