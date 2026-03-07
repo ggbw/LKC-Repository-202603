@@ -1,31 +1,50 @@
-import React, { useState, useMemo } from 'react';
-import { useExamResults, useStudents, useSubjects } from '@/hooks/useSupabaseData';
-import { Card, FilterSelect, GradeChip, Btn } from '@/components/SharedUI';
-import { FORMS, GRADES, G, P } from '@/data/database';
-import { downloadExcel } from '@/lib/excel';
-import { useApp } from '@/context/AppContext';
+import React, { useState, useMemo } from "react";
+import { useExamResults, useStudents, useSubjects, useExams } from "@/hooks/useSupabaseData";
+import { Card, FilterSelect, GradeChip, Btn } from "@/components/SharedUI";
+import { FORMS, GRADES, G, P } from "@/data/database";
+import { downloadExcel } from "@/lib/excel";
+import { useApp } from "@/context/AppContext";
 
 interface StudentRow {
-  name: string; className: string; subjects: Record<string, number | null>;
-  count: number; total: number; average: number; grade: string; position: number;
+  name: string;
+  className: string;
+  subjects: Record<string, number | null>;
+  count: number;
+  total: number;
+  average: number;
+  grade: string;
+  position: number;
 }
 
 export default function HOYReportPage() {
   const { data: results = [] } = useExamResults();
   const { data: students = [] } = useStudents();
   const { data: subjects = [] } = useSubjects();
+  const { data: exams = [] } = useExams();
   const { showToast } = useApp();
-  const [form, setForm] = useState('Form 5');
-  const [examName, setExamName] = useState('');
-  const [tab, setTab] = useState<'all' | 'top20' | 'low'>('all');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [form, setForm] = useState("Form 5");
+  const [examName, setExamName] = useState("");
+  const [tab, setTab] = useState<"all" | "top20" | "low">("all");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
 
-  const examNames = useMemo(() => [...new Set(results.map((r: any) => r.exam_name))].sort(), [results]);
+  // Only show exams marked for report card
+  const reportCardExamNames = useMemo(
+    () => new Set(exams.filter((e: any) => e.show_on_report_card !== false).map((e: any) => e.name)),
+    [exams],
+  );
+
+  // Filter results to only those belonging to report-card exams
+  const reportResults = useMemo(
+    () => results.filter((r: any) => reportCardExamNames.has(r.exam_name)),
+    [results, reportCardExamNames],
+  );
+
+  const examNames = useMemo(() => [...new Set(reportResults.map((r: any) => r.exam_name))].sort(), [reportResults]);
   const subjectNames = useMemo(() => subjects.map((s: any) => s.name).sort(), [subjects]);
 
   const rows: StudentRow[] = useMemo(() => {
     const formStudents = students.filter((s: any) => s.form === form);
-    const formResults = results.filter((r: any) => {
+    const formResults = reportResults.filter((r: any) => {
       const student = students.find((s: any) => s.id === r.student_id);
       if (!student || student.form !== form) return false;
       if (examName && r.exam_name !== examName) return false;
@@ -38,44 +57,58 @@ export default function HOYReportPage() {
       const student = students.find((s: any) => s.id === sid);
       if (!student) return;
       if (!byStudent[sid]) {
-        byStudent[sid] = { name: student.full_name, className: student.class_name || form.replace('Form ', ''), marks: {} };
+        byStudent[sid] = {
+          name: student.full_name,
+          className: student.class_name || form.replace("Form ", ""),
+          marks: {},
+        };
       }
-      const subName = r.subjects?.name || 'Unknown';
+      const subName = r.subjects?.name || "Unknown";
       const pct = P(Number(r.obtained_marks), Number(r.max_marks));
       byStudent[sid].marks[subName] = pct;
     });
 
-    const studentRows = Object.values(byStudent).map(s => {
+    const studentRows = Object.values(byStudent).map((s) => {
       const marks = Object.values(s.marks);
       const count = marks.length;
       const total = marks.reduce((a, b) => a + b, 0);
       const average = count > 0 ? Math.round(total / count) : 0;
       return {
-        name: s.name, className: s.className,
-        subjects: subjectNames.reduce((acc, sub) => ({ ...acc, [sub]: s.marks[sub] ?? null }), {} as Record<string, number | null>),
-        count, total, average, grade: G(average), position: 0,
+        name: s.name,
+        className: s.className,
+        subjects: subjectNames.reduce(
+          (acc, sub) => ({ ...acc, [sub]: s.marks[sub] ?? null }),
+          {} as Record<string, number | null>,
+        ),
+        count,
+        total,
+        average,
+        grade: G(average),
+        position: 0,
       };
     });
 
     // Sort based on selected order
-    if (sortOrder === 'desc') {
+    if (sortOrder === "desc") {
       studentRows.sort((a, b) => b.average - a.average);
     } else {
       studentRows.sort((a, b) => a.average - b.average);
     }
-    studentRows.forEach((r, i) => { r.position = i + 1; });
+    studentRows.forEach((r, i) => {
+      r.position = i + 1;
+    });
     return studentRows;
-  }, [results, students, subjects, form, examName, subjectNames, sortOrder]);
+  }, [reportResults, students, subjects, form, examName, subjectNames, sortOrder]);
 
   const displayRows = useMemo(() => {
-    if (tab === 'top20') return rows.slice(0, 20);
-    if (tab === 'low') return rows.filter(r => r.average < 50);
+    if (tab === "top20") return rows.slice(0, 20);
+    if (tab === "low") return rows.filter((r) => r.average < 50);
     return rows;
   }, [rows, tab]);
 
   const subjectStats = useMemo(() => {
     const stats: Record<string, { count: number; total: number }> = {};
-    rows.forEach(r => {
+    rows.forEach((r) => {
       Object.entries(r.subjects).forEach(([sub, mark]) => {
         if (mark !== null) {
           if (!stats[sub]) stats[sub] = { count: 0, total: 0 };
@@ -89,146 +122,303 @@ export default function HOYReportPage() {
 
   const gradeDist = useMemo(() => {
     const dist: Record<string, number> = {};
-    GRADES.forEach(g => { dist[g] = 0; });
-    rows.forEach(r => { dist[r.grade] = (dist[r.grade] || 0) + 1; });
+    GRADES.forEach((g) => {
+      dist[g] = 0;
+    });
+    rows.forEach((r) => {
+      dist[r.grade] = (dist[r.grade] || 0) + 1;
+    });
     return dist;
   }, [rows]);
 
-  const creditPass = rows.length ? Math.round(rows.filter(r => r.average >= 60).length / rows.length * 100 * 100) / 100 : 0;
-  const activeSubjects = subjectNames.filter(s => subjectStats[s]?.count > 0);
+  const creditPass = rows.length
+    ? Math.round((rows.filter((r) => r.average >= 60).length / rows.length) * 100 * 100) / 100
+    : 0;
+  const activeSubjects = subjectNames.filter((s) => subjectStats[s]?.count > 0);
 
-  const tabs = [['all', `All Students (${rows.length})`], ['top20', 'Top 20 Achievers'], ['low', 'Low Achievers']];
+  const tabs = [
+    ["all", `All Students (${rows.length})`],
+    ["top20", "Top 20 Achievers"],
+    ["low", "Low Achievers"],
+  ];
 
   const handleExport = () => {
-    const data = displayRows.map(r => {
+    const data = displayRows.map((r) => {
       const row: Record<string, any> = { Position: r.position, Name: r.name, Class: r.className };
-      activeSubjects.forEach(s => { row[s] = r.subjects[s] ?? ''; });
-      row['Count'] = r.count; row['Total'] = r.total; row['Average'] = r.average; row['Grade'] = r.grade;
+      activeSubjects.forEach((s) => {
+        row[s] = r.subjects[s] ?? "";
+      });
+      row["Count"] = r.count;
+      row["Total"] = r.total;
+      row["Average"] = r.average;
+      row["Grade"] = r.grade;
       return row;
     });
-    downloadExcel(data, `hoy_${form}_${examName || 'all'}`, 'HOY Report');
-    showToast('Exported');
+    downloadExcel(data, `hoy_${form}_${examName || "all"}`, "HOY Report");
+    showToast("Exported");
   };
 
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
         <div>
-          <div className="text-lg font-bold"><i className="fas fa-chart-pie mr-2" />HOY Grades Analysis</div>
-          <div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>End of Term Analysis · {form}</div>
+          <div className="text-lg font-bold">
+            <i className="fas fa-chart-pie mr-2" />
+            HOY Grades Analysis
+          </div>
+          <div className="text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+            End of Term Analysis · {form}
+          </div>
         </div>
-        <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
+        <Btn variant="outline" onClick={handleExport}>
+          <i className="fas fa-download mr-1" />
+          Export
+        </Btn>
       </div>
 
       <Card title="Filters" className="mb-3.5">
         <div className="flex gap-3 flex-wrap items-end">
           <div>
-            <div className="text-[11px] font-semibold mb-1" style={{ color: 'hsl(var(--text2))' }}>Form</div>
-            <FilterSelect value={form} onChange={setForm} allLabel="" options={FORMS.map(f => ({ value: f, label: f }))} />
+            <div className="text-[11px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+              Form
+            </div>
+            <FilterSelect
+              value={form}
+              onChange={setForm}
+              allLabel=""
+              options={FORMS.map((f) => ({ value: f, label: f }))}
+            />
           </div>
           <div>
-            <div className="text-[11px] font-semibold mb-1" style={{ color: 'hsl(var(--text2))' }}>Exam</div>
-            <FilterSelect value={examName} onChange={setExamName} allLabel="All Exams" options={examNames.map((e: string) => ({ value: e, label: e }))} />
+            <div className="text-[11px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+              Exam
+            </div>
+            <FilterSelect
+              value={examName}
+              onChange={setExamName}
+              allLabel="All Exams"
+              options={examNames.map((e: string) => ({ value: e, label: e }))}
+            />
           </div>
           <div>
-            <div className="text-[11px] font-semibold mb-1" style={{ color: 'hsl(var(--text2))' }}>Sort By Marks</div>
-            <FilterSelect value={sortOrder} onChange={v => setSortOrder(v as any)} allLabel=""
-              options={[{ value: 'desc', label: '↓ Highest First' }, { value: 'asc', label: '↑ Lowest First' }]} />
+            <div className="text-[11px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+              Sort By Marks
+            </div>
+            <FilterSelect
+              value={sortOrder}
+              onChange={(v) => setSortOrder(v as any)}
+              allLabel=""
+              options={[
+                { value: "desc", label: "↓ Highest First" },
+                { value: "asc", label: "↑ Lowest First" },
+              ]}
+            />
           </div>
+        </div>
+        <div className="mt-2.5 text-[10px] flex items-center gap-1" style={{ color: "hsl(var(--text3))" }}>
+          <i className="fas fa-info-circle" />
+          Only exams marked <strong>"Include on report card"</strong> are shown here.
+          {exams.filter((e: any) => e.show_on_report_card === false).length > 0 && (
+            <span
+              className="ml-1 px-1.5 py-0.5 rounded font-semibold"
+              style={{ background: "#fff8c5", color: "#9a6700", border: "1px solid #ffe07c" }}
+            >
+              {exams.filter((e: any) => e.show_on_report_card === false).length} exam(s) excluded
+            </span>
+          )}
         </div>
       </Card>
 
-      <div className="flex mb-3" style={{ borderBottom: '2px solid hsl(var(--border))' }}>
+      <div className="flex mb-3" style={{ borderBottom: "2px solid hsl(var(--border))" }}>
         {tabs.map(([id, label]) => (
-          <div key={id} onClick={() => setTab(id as any)}
+          <div
+            key={id}
+            onClick={() => setTab(id as any)}
             className="py-2 px-4 text-[12px] font-semibold cursor-pointer"
             style={{
-              borderBottom: tab === id ? '2px solid #1a3fa0' : '2px solid transparent',
-              color: tab === id ? '#1a3fa0' : 'hsl(var(--text2))', marginBottom: '-2px',
-            }}>{label}</div>
+              borderBottom: tab === id ? "2px solid #1a3fa0" : "2px solid transparent",
+              color: tab === id ? "#1a3fa0" : "hsl(var(--text2))",
+              marginBottom: "-2px",
+            }}
+          >
+            {label}
+          </div>
         ))}
       </div>
 
       {displayRows.length === 0 ? (
-        <Card><div className="text-center py-10 text-xs" style={{ color: 'hsl(var(--text3))' }}>No exam results found for {form}.</div></Card>
+        <Card>
+          <div className="text-center py-10 text-xs" style={{ color: "hsl(var(--text3))" }}>
+            No exam results found for {form}.
+          </div>
+        </Card>
       ) : (
-        <Card style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="text-center font-bold text-[13px] py-2.5 px-4" style={{ background: '#1a3fa0', color: '#fff' }}>
-            {tab === 'top20' ? `Top 20 Achievers — ${form}` : tab === 'low' ? `Low Achievers — ${form}` : `${form} — ${examName || 'All Exams'} — Consolidated Analysis`}
-            <span className="text-[10px] ml-2 font-normal opacity-80">({sortOrder === 'desc' ? 'Highest → Lowest' : 'Lowest → Highest'})</span>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <div
+            className="text-center font-bold text-[13px] py-2.5 px-4"
+            style={{ background: "#1a3fa0", color: "#fff" }}
+          >
+            {tab === "top20"
+              ? `Top 20 Achievers — ${form}`
+              : tab === "low"
+                ? `Low Achievers — ${form}`
+                : `${form} — ${examName || "All Exams"} — Consolidated Analysis`}
+            <span className="text-[10px] ml-2 font-normal opacity-80">
+              ({sortOrder === "desc" ? "Highest → Lowest" : "Lowest → Highest"})
+            </span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse" style={{ fontSize: '10.5px' }}>
+            <table className="w-full border-collapse" style={{ fontSize: "10.5px" }}>
               <thead>
-                <tr style={{ background: '#f6f8fa', borderBottom: '2px solid hsl(var(--border))' }}>
-                  <th className="py-2 px-2 text-center text-[9px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>Pos</th>
-                  <th className="py-2 px-2 text-left text-[9px] font-semibold uppercase whitespace-nowrap" style={{ color: 'hsl(var(--text2))', minWidth: '160px' }}>Name & Surname</th>
-                  <th className="py-2 px-2 text-center text-[9px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>Class</th>
-                  {activeSubjects.map(s => (
-                    <th key={s} className="py-2 px-1 text-center text-[8px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))', writingMode: 'vertical-lr', height: '80px', maxWidth: '24px' }}>{s}</th>
+                <tr style={{ background: "#f6f8fa", borderBottom: "2px solid hsl(var(--border))" }}>
+                  <th
+                    className="py-2 px-2 text-center text-[9px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    Pos
+                  </th>
+                  <th
+                    className="py-2 px-2 text-left text-[9px] font-semibold uppercase whitespace-nowrap"
+                    style={{ color: "hsl(var(--text2))", minWidth: "160px" }}
+                  >
+                    Name & Surname
+                  </th>
+                  <th
+                    className="py-2 px-2 text-center text-[9px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    Class
+                  </th>
+                  {activeSubjects.map((s) => (
+                    <th
+                      key={s}
+                      className="py-2 px-1 text-center text-[8px] font-semibold uppercase"
+                      style={{
+                        color: "hsl(var(--text2))",
+                        writingMode: "vertical-lr",
+                        height: "80px",
+                        maxWidth: "24px",
+                      }}
+                    >
+                      {s}
+                    </th>
                   ))}
-                  <th className="py-2 px-2 text-center text-[9px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>Count</th>
-                  <th className="py-2 px-2 text-center text-[9px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>Total</th>
-                  <th className="py-2 px-2 text-center text-[9px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>Avg</th>
-                  <th className="py-2 px-2 text-center text-[9px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>Grade</th>
+                  <th
+                    className="py-2 px-2 text-center text-[9px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    Count
+                  </th>
+                  <th
+                    className="py-2 px-2 text-center text-[9px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    Total
+                  </th>
+                  <th
+                    className="py-2 px-2 text-center text-[9px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    Avg
+                  </th>
+                  <th
+                    className="py-2 px-2 text-center text-[9px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    Grade
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {displayRows.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f0f2f5', background: i % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                  <tr
+                    key={i}
+                    style={{ borderBottom: "1px solid #f0f2f5", background: i % 2 === 0 ? "#fff" : "#fafbfc" }}
+                  >
                     <td className="py-1.5 px-2 text-center font-mono font-bold">{r.position}</td>
                     <td className="py-1.5 px-2 font-semibold whitespace-nowrap">{r.name}</td>
                     <td className="py-1.5 px-2 text-center font-mono">{r.className}</td>
-                    {activeSubjects.map(s => {
+                    {activeSubjects.map((s) => {
                       const mark = r.subjects[s];
-                      const color = mark === null ? '#e0e0e0' : mark >= 60 ? '#1a7f37' : mark >= 50 ? '#9a6700' : '#cf222e';
+                      const color =
+                        mark === null ? "#e0e0e0" : mark >= 60 ? "#1a7f37" : mark >= 50 ? "#9a6700" : "#cf222e";
                       return (
-                        <td key={s} className="py-1.5 px-1 text-center font-mono font-bold" style={{ color: mark === null ? '#e0e0e0' : color }}>
-                          {mark !== null ? mark : ''}
+                        <td
+                          key={s}
+                          className="py-1.5 px-1 text-center font-mono font-bold"
+                          style={{ color: mark === null ? "#e0e0e0" : color }}
+                        >
+                          {mark !== null ? mark : ""}
                         </td>
                       );
                     })}
                     <td className="py-1.5 px-2 text-center font-mono">{r.count}</td>
                     <td className="py-1.5 px-2 text-center font-mono font-bold">{r.total}</td>
                     <td className="py-1.5 px-2 text-center font-mono font-bold">{r.average}</td>
-                    <td className="py-1.5 px-2 text-center"><GradeChip grade={r.grade} /></td>
+                    <td className="py-1.5 px-2 text-center">
+                      <GradeChip grade={r.grade} />
+                    </td>
                   </tr>
                 ))}
-                <tr style={{ background: '#f0f6ff', borderTop: '2px solid hsl(var(--border))' }}>
-                  <td colSpan={3} className="py-2 px-2 font-bold text-[10px]">No. of Students</td>
-                  {activeSubjects.map(s => (
-                    <td key={s} className="py-2 px-1 text-center font-mono font-bold">{subjectStats[s]?.count || 0}</td>
+                <tr style={{ background: "#f0f6ff", borderTop: "2px solid hsl(var(--border))" }}>
+                  <td colSpan={3} className="py-2 px-2 font-bold text-[10px]">
+                    No. of Students
+                  </td>
+                  {activeSubjects.map((s) => (
+                    <td key={s} className="py-2 px-1 text-center font-mono font-bold">
+                      {subjectStats[s]?.count || 0}
+                    </td>
                   ))}
                   <td colSpan={4} />
                 </tr>
-                <tr style={{ background: '#f0f6ff' }}>
-                  <td colSpan={3} className="py-2 px-2 font-bold text-[10px]">% Subject Average</td>
-                  {activeSubjects.map(s => {
+                <tr style={{ background: "#f0f6ff" }}>
+                  <td colSpan={3} className="py-2 px-2 font-bold text-[10px]">
+                    % Subject Average
+                  </td>
+                  {activeSubjects.map((s) => {
                     const st = subjectStats[s];
                     const avg = st && st.count > 0 ? Math.round(st.total / st.count) : 0;
-                    return <td key={s} className="py-2 px-1 text-center font-mono font-bold">{avg || ''}</td>;
+                    return (
+                      <td key={s} className="py-2 px-1 text-center font-mono font-bold">
+                        {avg || ""}
+                      </td>
+                    );
                   })}
                   <td colSpan={4} />
                 </tr>
-                <tr style={{ background: '#f0fff4' }}>
-                  <td colSpan={3} className="py-2 px-2 font-bold text-[10px]" style={{ color: '#1a7f37' }}>CREDIT PASS</td>
-                  <td colSpan={activeSubjects.length} className="py-2 px-2 text-center font-bold" style={{ color: '#1a7f37' }}>{creditPass}%</td>
+                <tr style={{ background: "#f0fff4" }}>
+                  <td colSpan={3} className="py-2 px-2 font-bold text-[10px]" style={{ color: "#1a7f37" }}>
+                    CREDIT PASS
+                  </td>
+                  <td
+                    colSpan={activeSubjects.length}
+                    className="py-2 px-2 text-center font-bold"
+                    style={{ color: "#1a7f37" }}
+                  >
+                    {creditPass}%
+                  </td>
                   <td colSpan={4} />
                 </tr>
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-3" style={{ background: '#f6f8fa', borderTop: '1px solid hsl(var(--border))' }}>
-            <div className="text-[10px] font-bold mb-2" style={{ color: 'hsl(var(--text2))' }}>Grade Distribution</div>
+          <div className="px-4 py-3" style={{ background: "#f6f8fa", borderTop: "1px solid hsl(var(--border))" }}>
+            <div className="text-[10px] font-bold mb-2" style={{ color: "hsl(var(--text2))" }}>
+              Grade Distribution
+            </div>
             <div className="flex gap-3">
-              {GRADES.map(g => (
+              {GRADES.map((g) => (
                 <div key={g} className="text-center">
-                  <div className="text-[10px] font-bold" style={{ color: 'hsl(var(--text2))' }}>{g}</div>
+                  <div className="text-[10px] font-bold" style={{ color: "hsl(var(--text2))" }}>
+                    {g}
+                  </div>
                   <div className="text-[13px] font-bold font-mono">{gradeDist[g]}</div>
                 </div>
               ))}
               <div className="text-center ml-4">
-                <div className="text-[10px] font-bold" style={{ color: 'hsl(var(--text2))' }}>Total</div>
+                <div className="text-[10px] font-bold" style={{ color: "hsl(var(--text2))" }}>
+                  Total
+                </div>
                 <div className="text-[13px] font-bold font-mono">{rows.length}</div>
               </div>
             </div>
