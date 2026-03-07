@@ -106,6 +106,7 @@ export type Database = {
           due_date: string | null
           form: string
           id: string
+          show_on_report_card: boolean | null
           state: string | null
           subject_id: string | null
           submission_type: string | null
@@ -123,6 +124,7 @@ export type Database = {
           due_date?: string | null
           form: string
           id?: string
+          show_on_report_card?: boolean | null
           state?: string | null
           subject_id?: string | null
           submission_type?: string | null
@@ -140,6 +142,7 @@ export type Database = {
           due_date?: string | null
           form?: string
           id?: string
+          show_on_report_card?: boolean | null
           state?: string | null
           subject_id?: string | null
           submission_type?: string | null
@@ -300,6 +303,7 @@ export type Database = {
           form: string
           id: string
           name: string
+          show_on_report_card: boolean | null
           start_date: string | null
           state: string | null
         }
@@ -310,6 +314,7 @@ export type Database = {
           form?: string
           id?: string
           name: string
+          show_on_report_card?: boolean | null
           start_date?: string | null
           state?: string | null
         }
@@ -320,6 +325,7 @@ export type Database = {
           form?: string
           id?: string
           name?: string
+          show_on_report_card?: boolean | null
           start_date?: string | null
           state?: string | null
         }
