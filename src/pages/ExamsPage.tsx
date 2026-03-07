@@ -119,7 +119,18 @@ export default function ExamsPage() {
             <Card key={e.id}>
               <div className="flex justify-between mb-2.5">
                 <div className="font-bold text-sm">{e.name}</div>
-                <Badge status={e.state || "draft"} />
+                <div className="flex items-center gap-1.5">
+                  {e.show_on_report_card === false && (
+                    <span
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                      style={{ background: "#fff8c5", color: "#9a6700", border: "1px solid #ffe07c" }}
+                    >
+                      <i className="fas fa-eye-slash mr-0.5" />
+                      No Report Card
+                    </span>
+                  )}
+                  <Badge status={e.state || "draft"} />
+                </div>
               </div>
               <div className="text-[11px] mb-0.5" style={{ color: "hsl(var(--text2))" }}>
                 <i className="fas fa-school mr-1" />
@@ -487,6 +498,7 @@ function ExamModal({ onClose }: { onClose: () => void }) {
   const [className, setClassName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [showOnReport, setShowOnReport] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Derive available classes for the selected form
@@ -514,6 +526,7 @@ function ExamModal({ onClose }: { onClose: () => void }) {
       start_date: startDate || null,
       end_date: endDate || null,
       state: "draft",
+      show_on_report_card: showOnReport,
     });
     if (error) {
       showToast(error.message, "error");
@@ -607,6 +620,41 @@ function ExamModal({ onClose }: { onClose: () => void }) {
           <Field label="End Date">
             <FieldInput value={endDate} onChange={setEndDate} type="date" />
           </Field>
+        </div>
+
+        {/* ── Report Card Toggle ── */}
+        <div
+          className="flex items-center justify-between rounded-lg px-3.5 py-3 mt-1 cursor-pointer"
+          style={{
+            background: showOnReport ? "#dafbe1" : "hsl(var(--surface2))",
+            border: `1px solid ${showOnReport ? "#aceebb" : "hsl(var(--border))"}`,
+            transition: "all 0.15s",
+          }}
+          onClick={() => setShowOnReport((v) => !v)}
+        >
+          <div>
+            <div
+              className="text-[12.5px] font-semibold"
+              style={{ color: showOnReport ? "#1a7f37" : "hsl(var(--text2))" }}
+            >
+              <i className={`fas ${showOnReport ? "fa-check-square" : "fa-square"} mr-2`} />
+              Include results on report card
+            </div>
+            <div className="text-[10px] mt-0.5 ml-5" style={{ color: showOnReport ? "#2ea043" : "hsl(var(--text3))" }}>
+              {showOnReport
+                ? "Results from this exam will appear on student report cards"
+                : "Results will be recorded but hidden from report cards"}
+            </div>
+          </div>
+          <div
+            className="w-9 h-5 rounded-full flex-shrink-0 relative ml-3"
+            style={{ background: showOnReport ? "#2ea043" : "#d0d7de", transition: "background 0.15s" }}
+          >
+            <div
+              className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+              style={{ left: showOnReport ? "18px" : "2px" }}
+            />
+          </div>
         </div>
       </ModalBody>
       <ModalFoot>
