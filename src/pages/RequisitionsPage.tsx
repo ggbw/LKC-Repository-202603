@@ -99,7 +99,7 @@ export default function RequisitionsPage() {
     rejected: visibleReqs.filter((r: any) => r.status === 'Rejected').length,
   }), [visibleReqs]);
 
-  const allStatuses = [...new Set(allReqs.map((r: any) => r.status))] as string[];
+  const allStatuses = [...new Set(allReqs.map((r: any) => r.status))] as string[] as string[];
 
   return (
     <div className="page-animate">
@@ -442,7 +442,7 @@ function RequisitionDetail({ req, reqRoles, isAdmin, userId, onAction, onClose }
 
   return (
     <Modal onClose={onClose} size="lg">
-      <ModalHead title={<><span className="font-mono">{req.ref_number}</span></>} onClose={onClose} />
+      <Modalreq.ref_numberr}</span></>} onClose={onClose} />
       <ModalBody>
         {/* Progress stepper */}
         <div className="mb-5 p-4 rounded-lg" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>
