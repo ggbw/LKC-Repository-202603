@@ -99,7 +99,7 @@ export default function RequisitionsPage() {
     rejected: visibleReqs.filter((r: any) => r.status === 'Rejected').length,
   }), [visibleReqs]);
 
-  const allStatuses = [...new Set(allReqs.map((r: any) => r.status))];
+  const allStatuses = [...new Set(allReqs.map((r: any) => r.status))] as string[];
 
   return (
     <div className="page-animate">
