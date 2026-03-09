@@ -247,7 +247,7 @@ export function useClasses() {
   return useQuery({
     queryKey: ["classes"],
     queryFn: async () => {
-      const { data, error } = (await supabase.from("classes").select("*").order("form").order("name")) as any;
+      const { data, error } = await (supabase as any).from("classes").select("*").order("form").order("name");
       if (error) throw error;
       return data || [];
     },
@@ -258,10 +258,10 @@ export function useAcademicYears() {
   return useQuery({
     queryKey: ["academic_years"],
     queryFn: async () => {
-      const { data, error } = (await supabase
+      const { data, error } = await (supabase as any)
         .from("academic_years")
         .select("*")
-        .order("year", { ascending: false })) as any;
+        .order("year", { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -272,7 +272,7 @@ export function useForms() {
   return useQuery({
     queryKey: ["forms"],
     queryFn: async () => {
-      const { data, error } = (await supabase.from("forms").select("*").order("sort_order")) as any;
+      const { data, error } = await (supabase as any).from("forms").select("*").order("sort_order");
       if (error) throw error;
       return data || [];
     },
