@@ -352,29 +352,49 @@ function GeneralTab({
   const updateClass = async () => {
     if (!editClass) return;
     setSavingClass(true);
-    const { error } = await (supabase as any)
-      .from("classes")
-      .update({ form: editClass.form, name: editClass.name })
-      .eq("id", editClass.id);
-    if (error) {
-      showToast(error.message, "error");
+    if (editClass._fromStudents) {
+      // Not in classes table yet — insert it
+      await (supabase as any)
+        .from("students")
+        .update({ class_name: editClass.name })
+        .eq("class_name", editClass._origName || editClass.name)
+        .eq("form", editClass.form);
+      const { error } = await (supabase as any)
+        .from("classes")
+        .upsert({ form: editClass.form, name: editClass.name }, { onConflict: "form,name" });
+      if (error) {
+        showToast(error.message, "error");
+        setSavingClass(false);
+        return;
+      }
     } else {
-      showToast("Class updated");
-      invalidate(["classes"]);
-      setEditClass(null);
+      const { error } = await (supabase as any)
+        .from("classes")
+        .update({ form: editClass.form, name: editClass.name })
+        .eq("id", editClass.id);
+      if (error) {
+        showToast(error.message, "error");
+        setSavingClass(false);
+        return;
+      }
     }
+    showToast("Class updated");
+    invalidate(["classes", "students"]);
+    setEditClass(null);
     setSavingClass(false);
   };
-  const deleteClass = async (id: string, name: string) => {
+  const deleteClass = async (id: string, name: string, fromStudents?: boolean) => {
     if (!confirm(`Delete class "${name}"? Students will be unassigned.`)) return;
     await (supabase as any).from("students").update({ class_name: null }).eq("class_name", name);
-    const { error } = await (supabase as any).from("classes").delete().eq("id", id);
-    if (error) {
-      showToast(error.message, "error");
-    } else {
-      showToast(`Class "${name}" deleted`);
-      invalidate(["classes", "students"]);
+    if (!fromStudents) {
+      const { error } = await (supabase as any).from("classes").delete().eq("id", id);
+      if (error) {
+        showToast(error.message, "error");
+        return;
+      }
     }
+    showToast(`Class "${name}" deleted`);
+    invalidate(["classes", "students"]);
   };
 
   // ── Form actions ──
@@ -845,10 +865,10 @@ function GeneralTab({
                     {isAdmin && (
                       <td className="py-2 px-3">
                         <div className="flex gap-1">
-                          <Btn variant="outline" size="sm" onClick={() => setEditClass({ ...c })}>
+                          <Btn variant="outline" size="sm" onClick={() => setEditClass({ ...c, _origName: c.name })}>
                             <i className="fas fa-edit" />
                           </Btn>
-                          <Btn variant="danger" size="sm" onClick={() => deleteClass(c.id, c.name)}>
+                          <Btn variant="danger" size="sm" onClick={() => deleteClass(c.id, c.name, c._fromStudents)}>
                             <i className="fas fa-trash" />
                           </Btn>
                         </div>
@@ -1143,10 +1163,10 @@ function UserRoleModal({
 }) {
   const { showToast } = useApp();
   const invalidate = useInvalidate();
-  const isEdit = existing !== false && existing.id !== "";
+  const isEdit = existing.id !== "";
 
-  const [selectedUserId, setSelectedUserId] = useState(isEdit && existing ? existing.user_id : "");
-  const [role, setRole] = useState<AppRole>(isEdit && existing ? (existing.role as AppRole) : "student");
+  const [selectedUserId, setSelectedUserId] = useState(isEdit ? existing.user_id : "");
+  const [role, setRole] = useState<AppRole>(isEdit ? (existing.role as AppRole) : "student");
   const [saving, setSaving] = useState(false);
 
   const selectedProfile = profiles.find((p: any) => p.user_id === selectedUserId);
@@ -1156,7 +1176,7 @@ function UserRoleModal({
     setSaving(true);
     if (isEdit) {
       // Update: delete old + insert new (role is part of unique key so can't update in place)
-      await supabase.from("user_roles").delete().eq("id", existing ? existing.id : "");
+      await supabase.from("user_roles").delete().eq("id", existing.id);
       const { error } = (await supabase
         .from("user_roles")
         .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
@@ -1184,7 +1204,7 @@ function UserRoleModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={isEdit && existing ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
+      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
         {!isEdit && (
           <Field label="User" required>
@@ -1210,9 +1230,9 @@ function UserRoleModal({
             className="rounded-md px-3 py-2.5 mb-3 text-[12px]"
             style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
           >
-            <div className="font-semibold">{existing ? existing.name : ""}</div>
+            <div className="font-semibold">{existing.name}</div>
             <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text2))" }}>
-              Current role: <span className="font-semibold">{existing ? existing.role : ""}</span>
+              Current role: <span className="font-semibold">{existing.role}</span>
             </div>
           </div>
         )}
