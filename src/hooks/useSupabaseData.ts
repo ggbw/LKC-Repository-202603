@@ -220,6 +220,28 @@ export function useClassTeachers() {
   });
 }
 
+export function useAcademicYears() {
+  return useQuery({
+    queryKey: ['academic_years'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('academic_years').select('*').order('year', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    }
+  });
+}
+
+export function useForms() {
+  return useQuery({
+    queryKey: ['forms'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('forms').select('*').order('sort_order');
+      if (error) throw error;
+      return data || [];
+    }
+  });
+}
+
 // Utility: invalidate queries
 export function useInvalidate() {
   const qc = useQueryClient();
