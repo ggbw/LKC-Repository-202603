@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_years: {
+        Row: {
+          created_at: string | null
+          id: string
+          status: string
+          year: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          status?: string
+          year: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          status?: string
+          year?: string
+        }
+        Relationships: []
+      }
       admission_enquiries: {
         Row: {
           created_at: string | null
@@ -328,6 +349,27 @@ export type Database = {
           show_on_report_card?: boolean | null
           start_date?: string | null
           state?: string | null
+        }
+        Relationships: []
+      }
+      forms: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
         }
         Relationships: []
       }
