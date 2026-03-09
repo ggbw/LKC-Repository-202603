@@ -1145,8 +1145,8 @@ function UserRoleModal({
   const invalidate = useInvalidate();
   const isEdit = existing !== false && existing.id !== "";
 
-  const [selectedUserId, setSelectedUserId] = useState(isEdit ? existing.user_id : "");
-  const [role, setRole] = useState<AppRole>(isEdit ? (existing.role as AppRole) : "student");
+  const [selectedUserId, setSelectedUserId] = useState(isEdit && existing ? existing.user_id : "");
+  const [role, setRole] = useState<AppRole>(isEdit && existing ? (existing.role as AppRole) : "student");
   const [saving, setSaving] = useState(false);
 
   const selectedProfile = profiles.find((p: any) => p.user_id === selectedUserId);
