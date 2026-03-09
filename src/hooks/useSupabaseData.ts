@@ -247,9 +247,31 @@ export function useClasses() {
   return useQuery({
     queryKey: ["classes"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("classes").select("*").order("form").order("name");
-      if (error) throw error;
-      return data || [];
+      // Fetch from classes table
+      const { data: classRows } = await (supabase as any).from("classes").select("*").order("form").order("name");
+      // Also fetch distinct class_name/form from students as fallback
+      const { data: studentRows } = (await supabase
+        .from("students")
+        .select("form, class_name")
+        .not("class_name", "is", null)
+        .neq("class_name", "")) as any;
+
+      const merged = new Map<string, any>();
+      (classRows || []).forEach((c: any) => {
+        merged.set(`${c.form}__${c.name}`, c);
+      });
+      (studentRows || []).forEach((s: any) => {
+        const key = `${s.form}__${s.class_name}`;
+        if (!merged.has(key)) {
+          merged.set(key, { id: key, form: s.form, name: s.class_name, _fromStudents: true });
+        }
+      });
+
+      return Array.from(merged.values()).sort((a: any, b: any) => {
+        if (a.form < b.form) return -1;
+        if (a.form > b.form) return 1;
+        return a.name.localeCompare(b.name);
+      });
     },
   });
 }
@@ -258,10 +280,10 @@ export function useAcademicYears() {
   return useQuery({
     queryKey: ["academic_years"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = (await supabase
         .from("academic_years")
         .select("*")
-        .order("year", { ascending: false });
+        .order("year", { ascending: false })) as any;
       if (error) throw error;
       return data || [];
     },
@@ -272,7 +294,7 @@ export function useForms() {
   return useQuery({
     queryKey: ["forms"],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).from("forms").select("*").order("sort_order");
+      const { data, error } = (await supabase.from("forms").select("*").order("sort_order")) as any;
       if (error) throw error;
       return data || [];
     },
