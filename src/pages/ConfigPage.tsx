@@ -796,7 +796,7 @@ function GeneralTab({
         <table className="w-full border-collapse text-[12.5px] mb-3">
           <thead>
             <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
-              {["Form", "Class Name", "Students", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+              {["Form", "Class Name", ...(isAdmin ? ["Actions"] : [])].map((h) => (
                 <th
                   key={h}
                   className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
@@ -841,7 +841,6 @@ function GeneralTab({
                         onChange={(e) => setEditClass({ ...editClass, name: e.target.value })}
                       />
                     </td>
-                    <td className="py-1.5 px-3" />
                     <td className="py-1.5 px-3">
                       <div className="flex gap-1">
                         <Btn size="sm" onClick={updateClass} disabled={savingClass}>
@@ -859,9 +858,7 @@ function GeneralTab({
                       {c.form}
                     </td>
                     <td className="py-2 px-3 font-semibold">{c.name}</td>
-                    <td className="py-2 px-3 font-mono text-[11px]" style={{ color: "hsl(var(--text2))" }}>
-                      {subjects.length > 0 ? "—" : "—"}
-                    </td>
+
                     {isAdmin && (
                       <td className="py-2 px-3">
                         <div className="flex gap-1">
@@ -1163,10 +1160,10 @@ function UserRoleModal({
 }) {
   const { showToast } = useApp();
   const invalidate = useInvalidate();
-  const isEdit = existing !== false && existing.id !== "";
+  const isEdit = existing.id !== "";
 
-  const [selectedUserId, setSelectedUserId] = useState(isEdit && existing ? existing.user_id : "");
-  const [role, setRole] = useState<AppRole>(isEdit && existing ? (existing.role as AppRole) : "student");
+  const [selectedUserId, setSelectedUserId] = useState(isEdit ? existing.user_id : "");
+  const [role, setRole] = useState<AppRole>(isEdit ? (existing.role as AppRole) : "student");
   const [saving, setSaving] = useState(false);
 
   const selectedProfile = profiles.find((p: any) => p.user_id === selectedUserId);
@@ -1176,7 +1173,7 @@ function UserRoleModal({
     setSaving(true);
     if (isEdit) {
       // Update: delete old + insert new (role is part of unique key so can't update in place)
-      await supabase.from("user_roles").delete().eq("id", (existing as any).id);
+      await supabase.from("user_roles").delete().eq("id", existing.id);
       const { error } = (await supabase
         .from("user_roles")
         .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
@@ -1204,7 +1201,7 @@ function UserRoleModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={isEdit && existing ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
+      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
         {!isEdit && (
           <Field label="User" required>
@@ -1230,9 +1227,9 @@ function UserRoleModal({
             className="rounded-md px-3 py-2.5 mb-3 text-[12px]"
             style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
           >
-            <div className="font-semibold">{isEdit ? (existing as any).name : ""}</div>
+            <div className="font-semibold">{existing.name}</div>
             <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text2))" }}>
-              Current role: <span className="font-semibold">{isEdit ? (existing as any).role : ""}</span>
+              Current role: <span className="font-semibold">{existing.role}</span>
             </div>
           </div>
         )}
