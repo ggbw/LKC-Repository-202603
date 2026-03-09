@@ -1173,7 +1173,7 @@ function UserRoleModal({
     setSaving(true);
     if (isEdit) {
       // Update: delete old + insert new (role is part of unique key so can't update in place)
-      if (existing) await supabase.from("user_roles").delete().eq("id", existing.id);
+      if (existing) if (existing) await supabase.from("user_roles").delete().eq("id", existing.id);
       const { error } = (await supabase
         .from("user_roles")
         .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
@@ -1201,7 +1201,7 @@ function UserRoleModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
+      <ModalHead && existing title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
         {!isEdit && (
           <Field label="User" required>
