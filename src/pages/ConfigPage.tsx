@@ -1156,7 +1156,7 @@ function UserRoleModal({
     setSaving(true);
     if (isEdit) {
       // Update: delete old + insert new (role is part of unique key so can't update in place)
-      await supabase.from("user_roles").delete().eq("id", existing.id);
+      await supabase.from("user_roles").delete().eq("id", existing ? existing.id : "");
       const { error } = (await supabase
         .from("user_roles")
         .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
