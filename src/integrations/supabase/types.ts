@@ -539,6 +539,131 @@ export type Database = {
         }
         Relationships: []
       }
+      requisition_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_name: string
+          created_at: string | null
+          id: string
+          note: string | null
+          requisition_id: string
+          stage: number | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_name: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          requisition_id: string
+          stage?: number | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_name?: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          requisition_id?: string
+          stage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "requisition_logs_requisition_id_fkey"
+            columns: ["requisition_id"]
+            isOneToOne: false
+            referencedRelation: "requisitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      requisitions: {
+        Row: {
+          attachment_name: string | null
+          attachment_url: string | null
+          category: Database["public"]["Enums"]["req_category"]
+          created_at: string | null
+          current_stage: number
+          date_required: string
+          department: string
+          dept_reviewer_id: string | null
+          description: string
+          estimated_cost: number
+          exec_approver_id: string | null
+          executor: Database["public"]["Enums"]["req_executor"] | null
+          executor_assigned_by: string | null
+          id: string
+          justification: string
+          quantity: number
+          ref_number: string
+          rejection_reason: string | null
+          requestor_id: string | null
+          requestor_name: string
+          review_note: string | null
+          screening_officer_id: string | null
+          status: Database["public"]["Enums"]["req_status"]
+          updated_at: string | null
+          urgency: Database["public"]["Enums"]["req_urgency"]
+        }
+        Insert: {
+          attachment_name?: string | null
+          attachment_url?: string | null
+          category: Database["public"]["Enums"]["req_category"]
+          created_at?: string | null
+          current_stage?: number
+          date_required: string
+          department: string
+          dept_reviewer_id?: string | null
+          description: string
+          estimated_cost?: number
+          exec_approver_id?: string | null
+          executor?: Database["public"]["Enums"]["req_executor"] | null
+          executor_assigned_by?: string | null
+          id?: string
+          justification: string
+          quantity?: number
+          ref_number?: string
+          rejection_reason?: string | null
+          requestor_id?: string | null
+          requestor_name: string
+          review_note?: string | null
+          screening_officer_id?: string | null
+          status?: Database["public"]["Enums"]["req_status"]
+          updated_at?: string | null
+          urgency?: Database["public"]["Enums"]["req_urgency"]
+        }
+        Update: {
+          attachment_name?: string | null
+          attachment_url?: string | null
+          category?: Database["public"]["Enums"]["req_category"]
+          created_at?: string | null
+          current_stage?: number
+          date_required?: string
+          department?: string
+          dept_reviewer_id?: string | null
+          description?: string
+          estimated_cost?: number
+          exec_approver_id?: string | null
+          executor?: Database["public"]["Enums"]["req_executor"] | null
+          executor_assigned_by?: string | null
+          id?: string
+          justification?: string
+          quantity?: number
+          ref_number?: string
+          rejection_reason?: string | null
+          requestor_id?: string | null
+          requestor_name?: string
+          review_note?: string | null
+          screening_officer_id?: string | null
+          status?: Database["public"]["Enums"]["req_status"]
+          updated_at?: string | null
+          urgency?: Database["public"]["Enums"]["req_urgency"]
+        }
+        Relationships: []
+      }
       student_subjects: {
         Row: {
           id: string
@@ -829,6 +954,28 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "teacher" | "student" | "parent" | "hod" | "hoy"
+      req_category:
+        | "Stationery"
+        | "Maintenance"
+        | "ICT Equipment"
+        | "Vehicle/Transport"
+        | "Resource Centre"
+        | "Other"
+      req_executor:
+        | "Stationery Officer"
+        | "Maintenance Officer"
+        | "ICT Head"
+        | "CFO"
+        | "Resource Centre Admin"
+      req_status:
+        | "Pending Departmental Review"
+        | "Recommended by Departmental Reviewer"
+        | "Submitted to Screening & Documentation Officer"
+        | "Submitted to Executive Approver"
+        | "Approved - Action Pending"
+        | "Completed"
+        | "Rejected"
+      req_urgency: "Normal" | "Urgent" | "Emergency"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -957,6 +1104,31 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "teacher", "student", "parent", "hod", "hoy"],
+      req_category: [
+        "Stationery",
+        "Maintenance",
+        "ICT Equipment",
+        "Vehicle/Transport",
+        "Resource Centre",
+        "Other",
+      ],
+      req_executor: [
+        "Stationery Officer",
+        "Maintenance Officer",
+        "ICT Head",
+        "CFO",
+        "Resource Centre Admin",
+      ],
+      req_status: [
+        "Pending Departmental Review",
+        "Recommended by Departmental Reviewer",
+        "Submitted to Screening & Documentation Officer",
+        "Submitted to Executive Approver",
+        "Approved - Action Pending",
+        "Completed",
+        "Rejected",
+      ],
+      req_urgency: ["Normal", "Urgent", "Emergency"],
     },
   },
 } as const
