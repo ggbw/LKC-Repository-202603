@@ -252,6 +252,27 @@ export type Database = {
           },
         ]
       }
+      classes: {
+        Row: {
+          created_at: string | null
+          form: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          form: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          form?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       exam_results: {
         Row: {
           created_at: string | null

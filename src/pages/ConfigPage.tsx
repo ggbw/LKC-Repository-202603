@@ -1230,9 +1230,9 @@ function UserRoleModal({
             className="rounded-md px-3 py-2.5 mb-3 text-[12px]"
             style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
           >
-            <div className="font-semibold">{existing.name}</div>
+            <div className="font-semibold">{existing && existing !== false ? existing.name : ""}</div>
             <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text2))" }}>
-              Current role: <span className="font-semibold">{existing.role}</span>
+              Current role: <span className="font-semibold">{existing && existing !== false ? existing.role : ""}</span>
             </div>
           </div>
         )}
