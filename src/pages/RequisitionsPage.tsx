@@ -442,7 +442,7 @@ function RequisitionDetail({ req, reqRoles, isAdmin, userId, onAction, onClose }
 
   return (
     <Modal onClose={onClose} size="lg">
-      <Modalreq.ref_numberr}</span></>} onClose={onClose} />
+      <ModalHead title={req.ref_number} onClose={onClose} />
       <ModalBody>
         {/* Progress stepper */}
         <div className="mb-5 p-4 rounded-lg" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>
