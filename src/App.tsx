@@ -1,27 +1,28 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { AppProvider, useApp } from '@/context/AppContext';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Sidebar from '@/components/Sidebar';
-import Topbar from '@/components/Topbar';
-import LoginPage from '@/pages/LoginPage';
-import ChangePasswordPage from '@/pages/ChangePasswordPage';
-import AdmissionPage from '@/pages/AdmissionPage';
-import DashboardPage from '@/pages/DashboardPage';
-import StudentsPage from '@/pages/StudentsPage';
-import ParentsPage from '@/pages/ParentsPage';
-import FacultyPage from '@/pages/FacultyPage';
-import AssignmentsPage from '@/pages/AssignmentsPage';
-import ExamsPage from '@/pages/ExamsPage';
-import ResultsPage from '@/pages/ResultsPage';
-import AttendancePage from '@/pages/AttendancePage';
-import HODReportPage from '@/pages/HODReportPage';
-import HOYReportPage from '@/pages/HOYReportPage';
-import AnnouncementsPage from '@/pages/AnnouncementsPage';
-import ConfigPage from '@/pages/ConfigPage';
-import UserManagementPage from '@/pages/UserManagementPage';
-import ProfilePage from '@/pages/ProfilePage';
+import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { AppProvider, useApp } from "@/context/AppContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
+import LoginPage from "@/pages/LoginPage";
+import ChangePasswordPage from "@/pages/ChangePasswordPage";
+import AdmissionPage from "@/pages/AdmissionPage";
+import DashboardPage from "@/pages/DashboardPage";
+import StudentsPage from "@/pages/StudentsPage";
+import ParentsPage from "@/pages/ParentsPage";
+import FacultyPage from "@/pages/FacultyPage";
+import AssignmentsPage from "@/pages/AssignmentsPage";
+import ExamsPage from "@/pages/ExamsPage";
+import ResultsPage from "@/pages/ResultsPage";
+import AttendancePage from "@/pages/AttendancePage";
+import HODReportPage from "@/pages/HODReportPage";
+import HOYReportPage from "@/pages/HOYReportPage";
+import AnnouncementsPage from "@/pages/AnnouncementsPage";
+import ConfigPage from "@/pages/ConfigPage";
+import UserManagementPage from "@/pages/UserManagementPage";
+import ProfilePage from "@/pages/ProfilePage";
+import RequisitionsPage from "@/pages/RequisitionsPage";
 
 const queryClient = new QueryClient();
 
@@ -30,10 +31,12 @@ function ProtectedApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0d1117' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0d1117" }}>
         <div className="text-center">
           <img src="/images/lkc-logo.jpeg" alt="LKC" className="w-20 h-20 rounded-full mx-auto mb-4" />
-          <div className="text-sm" style={{ color: '#8b949e' }}>Loading...</div>
+          <div className="text-sm" style={{ color: "#8b949e" }}>
+            Loading...
+          </div>
         </div>
       </div>
     );
@@ -66,6 +69,7 @@ function AppInner() {
     config: <ConfigPage />,
     users: <UserManagementPage />,
     profile: <ProfilePage />,
+    requisitions: <RequisitionsPage />,
   };
 
   return (
