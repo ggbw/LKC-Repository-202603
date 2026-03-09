@@ -1,10 +1,39 @@
-import React, { useState, useMemo } from 'react';
-import { useSubjects, useTeachers, useStudents, useHODAssignments, useHOYAssignments, useSubjectTeachers, useStudentSubjects, useClassTeachers, useInvalidate } from '@/hooks/useSupabaseData';
-import { useAuth } from '@/context/AuthContext';
-import { useApp } from '@/context/AppContext';
-import { supabase } from '@/integrations/supabase/client';
-import { FORMS, cap } from '@/data/database';
-import { Card, Badge, Btn, FilterSelect, Modal, ModalHead, ModalBody, ModalFoot, Field, FieldSelect, SearchBar } from '@/components/SharedUI';
+import React, { useState, useMemo } from "react";
+import {
+  useSubjects,
+  useTeachers,
+  useStudents,
+  useHODAssignments,
+  useHOYAssignments,
+  useSubjectTeachers,
+  useStudentSubjects,
+  useClassTeachers,
+  useInvalidate,
+  useAcademicYears,
+  useForms,
+  useUserRoles,
+} from "@/hooks/useSupabaseData";
+import { useAuth } from "@/context/AuthContext";
+import { useApp } from "@/context/AppContext";
+import { supabase } from "@/integrations/supabase/client";
+import { FORMS, cap } from "@/data/database";
+import {
+  Card,
+  Badge,
+  Btn,
+  FilterSelect,
+  Modal,
+  ModalHead,
+  ModalBody,
+  ModalFoot,
+  Field,
+  FieldInput,
+  FieldSelect,
+  SearchBar,
+} from "@/components/SharedUI";
+
+const ALL_ROLES = ["admin", "teacher", "student", "parent", "hod", "hoy"] as const;
+type AppRole = (typeof ALL_ROLES)[number];
 
 export default function ConfigPage() {
   const { data: subjects = [] } = useSubjects();
@@ -23,138 +52,1061 @@ export default function ConfigPage() {
   const [stModal, setStModal] = useState(false);
   const [ssModal, setSsModal] = useState(false);
   const [ctModal, setCtModal] = useState(false);
-  const [tab, setTab] = useState<'general' | 'subject-teacher' | 'subject-student' | 'class-teacher'>('general');
+  const [tab, setTab] = useState<"general" | "subject-teacher" | "subject-student" | "class-teacher">("general");
 
   const tabs = [
-    ['general', 'General'],
-    ['subject-teacher', `Subject → Teacher (${subjectTeachers.length})`],
-    ['subject-student', `Subject → Student (${studentSubjects.length})`],
-    ['class-teacher', `Class Teachers (${classTeachers.length})`],
+    ["general", "General"],
+    ["subject-teacher", `Subject → Teacher (${subjectTeachers.length})`],
+    ["subject-student", `Subject → Student (${studentSubjects.length})`],
+    ["class-teacher", `Class Teachers (${classTeachers.length})`],
   ];
 
   return (
     <div className="page-animate">
-      <div className="text-lg font-bold mb-4"><i className="fas fa-cogs mr-2" />Configuration</div>
+      <div className="text-lg font-bold mb-4">
+        <i className="fas fa-cogs mr-2" />
+        Configuration
+      </div>
 
-      <div className="flex mb-3" style={{ borderBottom: '2px solid hsl(var(--border))' }}>
+      <div className="flex mb-3" style={{ borderBottom: "2px solid hsl(var(--border))" }}>
         {tabs.map(([id, label]) => (
-          <div key={id} onClick={() => setTab(id as any)}
+          <div
+            key={id}
+            onClick={() => setTab(id as any)}
             className="py-2 px-4 text-[12px] font-semibold cursor-pointer"
             style={{
-              borderBottom: tab === id ? '2px solid #1a3fa0' : '2px solid transparent',
-              color: tab === id ? '#1a3fa0' : 'hsl(var(--text2))', marginBottom: '-2px',
-            }}>{label}</div>
+              borderBottom: tab === id ? "2px solid #1a3fa0" : "2px solid transparent",
+              color: tab === id ? "#1a3fa0" : "hsl(var(--text2))",
+              marginBottom: "-2px",
+            }}
+          >
+            {label}
+          </div>
         ))}
       </div>
 
-      {tab === 'general' && <GeneralTab subjects={subjects} teachers={teachers} hodAssignments={hodAssignments} hoyAssignments={hoyAssignments}
-        isAdmin={isAdmin} setHodModal={setHodModal} setHoyModal={setHoyModal} />}
+      {tab === "general" && (
+        <GeneralTab
+          subjects={subjects}
+          teachers={teachers}
+          hodAssignments={hodAssignments}
+          hoyAssignments={hoyAssignments}
+          isAdmin={isAdmin}
+          showToast={showToast}
+          invalidate={invalidate}
+          setHodModal={setHodModal}
+          setHoyModal={setHoyModal}
+        />
+      )}
 
-      {tab === 'subject-teacher' && <SubjectTeacherTab subjectTeachers={subjectTeachers} subjects={subjects} teachers={teachers}
-        isAdmin={isAdmin} showToast={showToast} invalidate={invalidate} onAdd={() => setStModal(true)} />}
+      {tab === "subject-teacher" && (
+        <SubjectTeacherTab
+          subjectTeachers={subjectTeachers}
+          subjects={subjects}
+          teachers={teachers}
+          isAdmin={isAdmin}
+          showToast={showToast}
+          invalidate={invalidate}
+          onAdd={() => setStModal(true)}
+        />
+      )}
 
-      {tab === 'subject-student' && <SubjectStudentTab studentSubjects={studentSubjects} subjects={subjects} students={students}
-        isAdmin={isAdmin} showToast={showToast} invalidate={invalidate} onAdd={() => setSsModal(true)} />}
+      {tab === "subject-student" && (
+        <SubjectStudentTab
+          studentSubjects={studentSubjects}
+          subjects={subjects}
+          students={students}
+          isAdmin={isAdmin}
+          showToast={showToast}
+          invalidate={invalidate}
+          onAdd={() => setSsModal(true)}
+        />
+      )}
 
-      {tab === 'class-teacher' && <ClassTeacherTab classTeachers={classTeachers} teachers={teachers} students={students}
-        isAdmin={isAdmin} showToast={showToast} invalidate={invalidate} onAdd={() => setCtModal(true)} />}
+      {tab === "class-teacher" && (
+        <ClassTeacherTab
+          classTeachers={classTeachers}
+          teachers={teachers}
+          students={students}
+          isAdmin={isAdmin}
+          showToast={showToast}
+          invalidate={invalidate}
+          onAdd={() => setCtModal(true)}
+        />
+      )}
 
-      {hodModal && <RoleModal type="hod" teachers={teachers} onClose={() => { setHodModal(false); invalidate(['hod_assignments']); }} />}
-      {hoyModal && <RoleModal type="hoy" teachers={teachers} onClose={() => { setHoyModal(false); invalidate(['hoy_assignments']); }} />}
-      {stModal && <SubjectTeacherModal subjects={subjects} teachers={teachers} onClose={() => { setStModal(false); invalidate(['subject_teachers']); }} />}
-      {ssModal && <SubjectStudentModal subjects={subjects} students={students} onClose={() => { setSsModal(false); invalidate(['student_subjects']); }} />}
-      {ctModal && <ClassTeacherModal teachers={teachers} students={students} onClose={() => { setCtModal(false); invalidate(['class_teachers']); }} />}
+      {hodModal && (
+        <RoleModal
+          type="hod"
+          teachers={teachers}
+          onClose={() => {
+            setHodModal(false);
+            invalidate(["hod_assignments"]);
+          }}
+        />
+      )}
+      {hoyModal && (
+        <RoleModal
+          type="hoy"
+          teachers={teachers}
+          onClose={() => {
+            setHoyModal(false);
+            invalidate(["hoy_assignments"]);
+          }}
+        />
+      )}
+      {stModal && (
+        <SubjectTeacherModal
+          subjects={subjects}
+          teachers={teachers}
+          onClose={() => {
+            setStModal(false);
+            invalidate(["subject_teachers"]);
+          }}
+        />
+      )}
+      {ssModal && (
+        <SubjectStudentModal
+          subjects={subjects}
+          students={students}
+          onClose={() => {
+            setSsModal(false);
+            invalidate(["student_subjects"]);
+          }}
+        />
+      )}
+      {ctModal && (
+        <ClassTeacherModal
+          teachers={teachers}
+          students={students}
+          onClose={() => {
+            setCtModal(false);
+            invalidate(["class_teachers"]);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function GeneralTab({ subjects, teachers, hodAssignments, hoyAssignments, isAdmin, setHodModal, setHoyModal }: any) {
+// ─── General Tab ──────────────────────────────────────────────────────────────
+
+function GeneralTab({
+  subjects,
+  teachers,
+  hodAssignments,
+  hoyAssignments,
+  isAdmin,
+  showToast,
+  invalidate,
+  setHodModal,
+  setHoyModal,
+}: any) {
+  const { data: academicYears = [] } = useAcademicYears();
+  const { data: forms = [] } = useForms();
+  const { data: userRoles = [] } = useUserRoles();
+
+  // ── Academic Years state ──
+  const [newYear, setNewYear] = useState("");
+  const [yearStatus, setYearStatus] = useState("active");
+  const [editYear, setEditYear] = useState<any>(null);
+  const [savingYear, setSavingYear] = useState(false);
+
+  // ── Subjects state ──
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [newSubjectCode, setNewSubjectCode] = useState("");
+  const [editSubject, setEditSubject] = useState<any>(null);
+  const [savingSubject, setSavingSubject] = useState(false);
+
+  // ── Forms state ──
+  const [newFormName, setNewFormName] = useState("");
+  const [editForm, setEditForm] = useState<any>(null);
+  const [savingForm, setSavingForm] = useState(false);
+
+  // ── User Roles state ──
+  const [userRoleModal, setUserRoleModal] = useState(false);
+
+  // Group roles by user
+  const rolesByUser = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    userRoles.forEach((r: any) => {
+      if (!map[r.user_id]) map[r.user_id] = [];
+      map[r.user_id].push(r.role);
+    });
+    return map;
+  }, [userRoles]);
+
+  // ── Academic year actions ──
+  const addYear = async () => {
+    if (!newYear.trim()) return;
+    setSavingYear(true);
+    const { error } = (await supabase
+      .from("academic_years")
+      .insert({ year: newYear.trim(), status: yearStatus })) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Year ${newYear} added`);
+      invalidate(["academic_years"]);
+      setNewYear("");
+    }
+    setSavingYear(false);
+  };
+  const updateYear = async () => {
+    if (!editYear) return;
+    setSavingYear(true);
+    const { error } = (await supabase
+      .from("academic_years")
+      .update({ year: editYear.year, status: editYear.status })
+      .eq("id", editYear.id)) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Year updated");
+      invalidate(["academic_years"]);
+      setEditYear(null);
+    }
+    setSavingYear(false);
+  };
+  const deleteYear = async (id: string, year: string) => {
+    if (!confirm(`Delete academic year ${year}?`)) return;
+    const { error } = (await supabase.from("academic_years").delete().eq("id", id)) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Year ${year} deleted`);
+      invalidate(["academic_years"]);
+    }
+  };
+
+  // ── Subject actions ──
+  const addSubject = async () => {
+    if (!newSubjectName.trim()) return;
+    setSavingSubject(true);
+    const { error } = (await supabase
+      .from("subjects")
+      .insert({ name: newSubjectName.trim(), code: newSubjectCode.trim() || null })) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Subject "${newSubjectName}" added`);
+      invalidate(["subjects"]);
+      setNewSubjectName("");
+      setNewSubjectCode("");
+    }
+    setSavingSubject(false);
+  };
+  const updateSubject = async () => {
+    if (!editSubject) return;
+    setSavingSubject(true);
+    const { error } = (await supabase
+      .from("subjects")
+      .update({ name: editSubject.name, code: editSubject.code || null })
+      .eq("id", editSubject.id)) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Subject updated");
+      invalidate(["subjects"]);
+      setEditSubject(null);
+    }
+    setSavingSubject(false);
+  };
+  const deleteSubject = async (id: string, name: string) => {
+    if (!confirm(`Delete subject "${name}"? This may affect existing assignments.`)) return;
+    const { error } = (await supabase.from("subjects").delete().eq("id", id)) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Subject "${name}" deleted`);
+      invalidate(["subjects"]);
+    }
+  };
+
+  // ── Form actions ──
+  const addForm = async () => {
+    if (!newFormName.trim()) return;
+    setSavingForm(true);
+    const maxOrder = forms.length > 0 ? Math.max(...forms.map((f: any) => f.sort_order)) + 1 : 1;
+    const { error } = (await supabase.from("forms").insert({ name: newFormName.trim(), sort_order: maxOrder })) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Form "${newFormName}" added`);
+      invalidate(["forms"]);
+      setNewFormName("");
+    }
+    setSavingForm(false);
+  };
+  const updateForm = async () => {
+    if (!editForm) return;
+    setSavingForm(true);
+    const { error } = (await supabase
+      .from("forms")
+      .update({ name: editForm.name, sort_order: editForm.sort_order })
+      .eq("id", editForm.id)) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Form updated");
+      invalidate(["forms"]);
+      setEditForm(null);
+    }
+    setSavingForm(false);
+  };
+  const deleteForm = async (id: string, name: string) => {
+    if (!confirm(`Delete form "${name}"? This will not affect existing students.`)) return;
+    const { error } = (await supabase.from("forms").delete().eq("id", id)) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Form "${name}" deleted`);
+      invalidate(["forms"]);
+    }
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-3.5">
-      <Card title={<><i className="fas fa-calendar-alt mr-1.5" />Academic Years</>}>
-        {[{ y: '2026', s: 'active' }, { y: '2025', s: 'closed' }].map(({ y, s }) => (
-          <div key={y} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
-            <span style={{ color: 'hsl(var(--text2))' }}>{y}</span><Badge status={s} />
-          </div>
-        ))}
-      </Card>
-      <Card title={<><i className="fas fa-book mr-1.5" />Subjects ({subjects.length})</>}>
-        <div className="flex flex-wrap gap-1.5">
-          {subjects.map((s: any) => (
-            <span key={s.id} className="rounded-[5px] px-[9px] py-0.5 text-[11px]" style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>
-              {s.name} <span className="font-mono text-[9px]" style={{ color: 'hsl(var(--text3))' }}>{s.code}</span>
-            </span>
-          ))}
-        </div>
-      </Card>
-      <Card title={<><i className="fas fa-chart-line mr-1.5" />HOD Assignments</>} titleRight={isAdmin && <Btn variant="outline" size="sm" onClick={() => setHodModal(true)}><i className="fas fa-plus mr-1" />Assign</Btn>}>
-        {hodAssignments.length === 0 ? <div className="text-xs" style={{ color: 'hsl(var(--text3))' }}>No HOD assignments</div> : (
-          hodAssignments.map((h: any) => (
-            <div key={h.id} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
-              <span className="font-semibold">{h.teachers?.name || '—'}</span>
-              <span style={{ color: 'hsl(var(--text2))' }}>{h.department}</span>
+    <div className="space-y-4">
+      {/* ══ Academic Years ══ */}
+      <Card
+        title={
+          <>
+            <i className="fas fa-calendar-alt mr-1.5" />
+            Academic Years
+          </>
+        }
+      >
+        <table className="w-full border-collapse text-[12.5px] mb-3">
+          <thead>
+            <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+              {["Year", "Status", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+                <th
+                  key={h}
+                  className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
+                  style={{ color: "hsl(var(--text2))" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {academicYears.length === 0 && (
+              <tr>
+                <td colSpan={3} className="py-4 text-center text-xs" style={{ color: "hsl(var(--text3))" }}>
+                  No academic years
+                </td>
+              </tr>
+            )}
+            {academicYears.map((y: any) => (
+              <tr key={y.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                {editYear?.id === y.id ? (
+                  <>
+                    <td className="py-1.5 px-3">
+                      <input
+                        className="border rounded px-2 py-1 text-[12px] w-24"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editYear.year}
+                        onChange={(e) => setEditYear({ ...editYear, year: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <select
+                        className="border rounded px-2 py-1 text-[12px]"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editYear.status}
+                        onChange={(e) => setEditYear({ ...editYear, status: e.target.value })}
+                      >
+                        <option value="active">Active</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <div className="flex gap-1">
+                        <Btn size="sm" onClick={updateYear} disabled={savingYear}>
+                          {savingYear ? "…" : "Save"}
+                        </Btn>
+                        <Btn variant="outline" size="sm" onClick={() => setEditYear(null)}>
+                          Cancel
+                        </Btn>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-2 px-3 font-semibold">{y.year}</td>
+                    <td className="py-2 px-3">
+                      <Badge status={y.status} />
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1">
+                          <Btn variant="outline" size="sm" onClick={() => setEditYear({ ...y })}>
+                            <i className="fas fa-edit" />
+                          </Btn>
+                          <Btn variant="danger" size="sm" onClick={() => deleteYear(y.id, y.year)}>
+                            <i className="fas fa-trash" />
+                          </Btn>
+                        </div>
+                      </td>
+                    )}
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {isAdmin && (
+          <div className="flex gap-2 items-end pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Year
+              </div>
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                placeholder="e.g. 2027"
+                value={newYear}
+                onChange={(e) => setNewYear(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addYear()}
+              />
             </div>
-          ))
+            <div>
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Status
+              </div>
+              <select
+                className="border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                value={yearStatus}
+                onChange={(e) => setYearStatus(e.target.value)}
+              >
+                <option value="active">Active</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <Btn onClick={addYear} disabled={savingYear || !newYear.trim()}>
+              <i className="fas fa-plus mr-1" />
+              {savingYear ? "Adding…" : "Add Year"}
+            </Btn>
+          </div>
         )}
       </Card>
-      <Card title={<><i className="fas fa-chart-pie mr-1.5" />HOY Assignments</>} titleRight={isAdmin && <Btn variant="outline" size="sm" onClick={() => setHoyModal(true)}><i className="fas fa-plus mr-1" />Assign</Btn>}>
-        {hoyAssignments.length === 0 ? <div className="text-xs" style={{ color: 'hsl(var(--text3))' }}>No HOY assignments</div> : (
-          hoyAssignments.map((h: any) => (
-            <div key={h.id} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
-              <span className="font-semibold">{h.teachers?.name || '—'}</span>
-              <span style={{ color: 'hsl(var(--text2))' }}>{h.form}</span>
+
+      {/* ══ Subjects ══ */}
+      <Card
+        title={
+          <>
+            <i className="fas fa-book mr-1.5" />
+            Subjects ({subjects.length})
+          </>
+        }
+      >
+        <table className="w-full border-collapse text-[12.5px] mb-3">
+          <thead>
+            <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+              {["Name", "Code", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+                <th
+                  key={h}
+                  className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
+                  style={{ color: "hsl(var(--text2))" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {subjects.map((s: any) => (
+              <tr key={s.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                {editSubject?.id === s.id ? (
+                  <>
+                    <td className="py-1.5 px-3">
+                      <input
+                        className="border rounded px-2 py-1 text-[12px] w-full"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editSubject.name}
+                        onChange={(e) => setEditSubject({ ...editSubject, name: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <input
+                        className="border rounded px-2 py-1 text-[12px] w-20"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editSubject.code || ""}
+                        onChange={(e) => setEditSubject({ ...editSubject, code: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <div className="flex gap-1">
+                        <Btn size="sm" onClick={updateSubject} disabled={savingSubject}>
+                          {savingSubject ? "…" : "Save"}
+                        </Btn>
+                        <Btn variant="outline" size="sm" onClick={() => setEditSubject(null)}>
+                          Cancel
+                        </Btn>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-2 px-3 font-semibold">{s.name}</td>
+                    <td className="py-2 px-3 font-mono text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                      {s.code || "—"}
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1">
+                          <Btn variant="outline" size="sm" onClick={() => setEditSubject({ ...s })}>
+                            <i className="fas fa-edit" />
+                          </Btn>
+                          <Btn variant="danger" size="sm" onClick={() => deleteSubject(s.id, s.name)}>
+                            <i className="fas fa-trash" />
+                          </Btn>
+                        </div>
+                      </td>
+                    )}
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {isAdmin && (
+          <div className="flex gap-2 items-end pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Subject Name
+              </div>
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                placeholder="e.g. Mathematics"
+                value={newSubjectName}
+                onChange={(e) => setNewSubjectName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addSubject()}
+              />
             </div>
-          ))
+            <div className="w-28">
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Code
+              </div>
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                placeholder="e.g. MATH"
+                value={newSubjectCode}
+                onChange={(e) => setNewSubjectCode(e.target.value)}
+              />
+            </div>
+            <Btn onClick={addSubject} disabled={savingSubject || !newSubjectName.trim()}>
+              <i className="fas fa-plus mr-1" />
+              {savingSubject ? "Adding…" : "Add Subject"}
+            </Btn>
+          </div>
         )}
       </Card>
-      <Card title={<><i className="fas fa-school mr-1.5" />Forms</>}>
-        {FORMS.map(f => (
-          <div key={f} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
-            <span style={{ color: 'hsl(var(--text2))' }}>{f}</span>
+
+      {/* ══ Forms ══ */}
+      <Card
+        title={
+          <>
+            <i className="fas fa-school mr-1.5" />
+            Forms ({forms.length})
+          </>
+        }
+      >
+        <table className="w-full border-collapse text-[12.5px] mb-3">
+          <thead>
+            <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+              {["Form Name", "Sort Order", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+                <th
+                  key={h}
+                  className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
+                  style={{ color: "hsl(var(--text2))" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {forms.map((f: any) => (
+              <tr key={f.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                {editForm?.id === f.id ? (
+                  <>
+                    <td className="py-1.5 px-3">
+                      <input
+                        className="border rounded px-2 py-1 text-[12px]"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <input
+                        type="number"
+                        className="border rounded px-2 py-1 text-[12px] w-16"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editForm.sort_order}
+                        onChange={(e) => setEditForm({ ...editForm, sort_order: Number(e.target.value) })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <div className="flex gap-1">
+                        <Btn size="sm" onClick={updateForm} disabled={savingForm}>
+                          {savingForm ? "…" : "Save"}
+                        </Btn>
+                        <Btn variant="outline" size="sm" onClick={() => setEditForm(null)}>
+                          Cancel
+                        </Btn>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-2 px-3 font-semibold">{f.name}</td>
+                    <td className="py-2 px-3 font-mono text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                      {f.sort_order}
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1">
+                          <Btn variant="outline" size="sm" onClick={() => setEditForm({ ...f })}>
+                            <i className="fas fa-edit" />
+                          </Btn>
+                          <Btn variant="danger" size="sm" onClick={() => deleteForm(f.id, f.name)}>
+                            <i className="fas fa-trash" />
+                          </Btn>
+                        </div>
+                      </td>
+                    )}
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {isAdmin && (
+          <div className="flex gap-2 items-end pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Form Name
+              </div>
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                placeholder="e.g. Form 7"
+                value={newFormName}
+                onChange={(e) => setNewFormName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addForm()}
+              />
+            </div>
+            <Btn onClick={addForm} disabled={savingForm || !newFormName.trim()}>
+              <i className="fas fa-plus mr-1" />
+              {savingForm ? "Adding…" : "Add Form"}
+            </Btn>
           </div>
-        ))}
+        )}
       </Card>
-      <Card title={<><i className="fas fa-user-shield mr-1.5" />User Roles</>}>
-        <div className="text-xs" style={{ color: 'hsl(var(--text2))' }}>
-          <div className="mb-1">Admin, Teacher, Student, Parent, HOD, HOY</div>
-          <div className="text-[10px]" style={{ color: 'hsl(var(--text3))' }}>Assign HOD/HOY roles using the cards above.</div>
-        </div>
+
+      {/* ══ User Roles ══ */}
+      <Card
+        title={
+          <>
+            <i className="fas fa-user-shield mr-1.5" />
+            User Roles
+          </>
+        }
+        titleRight={
+          isAdmin && (
+            <Btn size="sm" onClick={() => setUserRoleModal(true)}>
+              <i className="fas fa-plus mr-1" />
+              Manage Roles
+            </Btn>
+          )
+        }
+      >
+        {userRoles.length === 0 ? (
+          <div className="text-xs py-4 text-center" style={{ color: "hsl(var(--text3))" }}>
+            No role assignments found
+          </div>
+        ) : (
+          <table className="w-full border-collapse text-[12.5px]">
+            <thead>
+              <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+                {["User ID", "Role", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+                  <th
+                    key={h}
+                    className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {userRoles.map((r: any) => (
+                <tr key={r.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                  <td className="py-2 px-3 font-mono text-[10px]" style={{ color: "hsl(var(--text2))" }}>
+                    {r.user_id}
+                  </td>
+                  <td className="py-2 px-3">
+                    <span
+                      className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                      style={{
+                        background:
+                          r.role === "admin"
+                            ? "#ffeef0"
+                            : r.role === "teacher"
+                              ? "#ddf4ff"
+                              : r.role === "student"
+                                ? "#dafbe1"
+                                : "#fff8c5",
+                        color:
+                          r.role === "admin"
+                            ? "#cf222e"
+                            : r.role === "teacher"
+                              ? "#0969da"
+                              : r.role === "student"
+                                ? "#1a7f37"
+                                : "#9a6700",
+                      }}
+                    >
+                      {r.role}
+                    </span>
+                  </td>
+                  {isAdmin && (
+                    <td className="py-2 px-3">
+                      <Btn
+                        variant="danger"
+                        size="sm"
+                        onClick={async () => {
+                          if (!confirm(`Remove ${r.role} role?`)) return;
+                          await supabase.from("user_roles").delete().eq("id", r.id);
+                          invalidate(["user_roles"]);
+                          showToast("Role removed");
+                        }}
+                      >
+                        <i className="fas fa-trash" />
+                      </Btn>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
+
+      {/* ══ HOD/HOY ══ */}
+      <div className="grid grid-cols-2 gap-3.5">
+        <Card
+          title={
+            <>
+              <i className="fas fa-chart-line mr-1.5" />
+              HOD Assignments
+            </>
+          }
+          titleRight={
+            isAdmin && (
+              <Btn variant="outline" size="sm" onClick={() => setHodModal(true)}>
+                <i className="fas fa-plus mr-1" />
+                Assign
+              </Btn>
+            )
+          }
+        >
+          {hodAssignments.length === 0 ? (
+            <div className="text-xs" style={{ color: "hsl(var(--text3))" }}>
+              No HOD assignments
+            </div>
+          ) : (
+            hodAssignments.map((h: any) => (
+              <div
+                key={h.id}
+                className="flex justify-between py-[7px] text-[12.5px]"
+                style={{ borderBottom: "1px solid #f6f8fa" }}
+              >
+                <span className="font-semibold">{h.teachers?.name || "—"}</span>
+                <div className="flex items-center gap-2">
+                  <span style={{ color: "hsl(var(--text2))" }}>{h.department}</span>
+                  {isAdmin && (
+                    <Btn
+                      variant="danger"
+                      size="sm"
+                      onClick={async () => {
+                        await supabase.from("hod_assignments").delete().eq("id", h.id);
+                        invalidate(["hod_assignments"]);
+                        showToast("HOD assignment removed");
+                      }}
+                    >
+                      <i className="fas fa-trash" />
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </Card>
+        <Card
+          title={
+            <>
+              <i className="fas fa-chart-pie mr-1.5" />
+              HOY Assignments
+            </>
+          }
+          titleRight={
+            isAdmin && (
+              <Btn variant="outline" size="sm" onClick={() => setHoyModal(true)}>
+                <i className="fas fa-plus mr-1" />
+                Assign
+              </Btn>
+            )
+          }
+        >
+          {hoyAssignments.length === 0 ? (
+            <div className="text-xs" style={{ color: "hsl(var(--text3))" }}>
+              No HOY assignments
+            </div>
+          ) : (
+            hoyAssignments.map((h: any) => (
+              <div
+                key={h.id}
+                className="flex justify-between py-[7px] text-[12.5px]"
+                style={{ borderBottom: "1px solid #f6f8fa" }}
+              >
+                <span className="font-semibold">{h.teachers?.name || "—"}</span>
+                <div className="flex items-center gap-2">
+                  <span style={{ color: "hsl(var(--text2))" }}>{h.form}</span>
+                  {isAdmin && (
+                    <Btn
+                      variant="danger"
+                      size="sm"
+                      onClick={async () => {
+                        await supabase.from("hoy_assignments").delete().eq("id", h.id);
+                        invalidate(["hoy_assignments"]);
+                        showToast("HOY assignment removed");
+                      }}
+                    >
+                      <i className="fas fa-trash" />
+                    </Btn>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </Card>
+      </div>
+
+      {userRoleModal && (
+        <UserRoleModal
+          onClose={() => {
+            setUserRoleModal(false);
+            invalidate(["user_roles"]);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── User Role Modal ──────────────────────────────────────────────────────────
+
+function UserRoleModal({ onClose }: { onClose: () => void }) {
+  const { showToast } = useApp();
+  const { data: userRoles = [] } = useUserRoles();
+  const invalidate = useInvalidate();
+  const [userId, setUserId] = useState("");
+  const [role, setRole] = useState<AppRole>("student");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!userId.trim() || !role) return;
+    setSaving(true);
+    const { error } = (await supabase
+      .from("user_roles")
+      .upsert({ user_id: userId.trim(), role }, { onConflict: "user_id,role" })) as any;
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Role "${role}" assigned`);
+      invalidate(["user_roles"]);
+      setUserId("");
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHead title="Manage User Role" onClose={onClose} />
+      <ModalBody>
+        <div
+          className="rounded-md px-3 py-2 mb-3 text-[11px]"
+          style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
+        >
+          <i className="fas fa-info-circle mr-1" />
+          Enter the user's UUID from Supabase Auth. You can find this in the User Management page or Supabase dashboard.
+        </div>
+        <Field label="User ID (UUID)" required>
+          <input
+            className="w-full border rounded-md py-[7px] px-3 text-[12px] font-mono"
+            style={{ borderColor: "hsl(var(--border))" }}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+          />
+        </Field>
+        <Field label="Role" required>
+          <FieldSelect
+            value={role}
+            onChange={(v) => setRole(v as AppRole)}
+            options={ALL_ROLES.map((r) => ({ value: r, label: cap(r) }))}
+          />
+        </Field>
+
+        {/* Existing roles table */}
+        {userRoles.length > 0 && (
+          <div className="mt-4">
+            <div className="text-[11px] font-semibold mb-2" style={{ color: "hsl(var(--text2))" }}>
+              Current Role Assignments
+            </div>
+            <div
+              className="max-h-[200px] overflow-y-auto rounded-lg"
+              style={{ border: "1px solid hsl(var(--border))" }}
+            >
+              {userRoles.map((r: any, i: number) => (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between px-3 py-2 text-[12px]"
+                  style={{
+                    borderBottom: i < userRoles.length - 1 ? "1px solid #f6f8fa" : "none",
+                    background: i % 2 === 0 ? "#fff" : "hsl(var(--surface2))",
+                  }}
+                >
+                  <div>
+                    <span className="font-mono text-[10px]" style={{ color: "hsl(var(--text3))" }}>
+                      {r.user_id.slice(0, 16)}…
+                    </span>
+                    <span
+                      className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                      style={{
+                        background:
+                          r.role === "admin"
+                            ? "#ffeef0"
+                            : r.role === "teacher"
+                              ? "#ddf4ff"
+                              : r.role === "student"
+                                ? "#dafbe1"
+                                : "#fff8c5",
+                        color:
+                          r.role === "admin"
+                            ? "#cf222e"
+                            : r.role === "teacher"
+                              ? "#0969da"
+                              : r.role === "student"
+                                ? "#1a7f37"
+                                : "#9a6700",
+                      }}
+                    >
+                      {r.role}
+                    </span>
+                  </div>
+                  <Btn
+                    variant="danger"
+                    size="sm"
+                    onClick={async () => {
+                      await supabase.from("user_roles").delete().eq("id", r.id);
+                      invalidate(["user_roles"]);
+                      showToast("Role removed");
+                    }}
+                  >
+                    <i className="fas fa-trash" />
+                  </Btn>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          Close
+        </Btn>
+        <Btn onClick={save} disabled={saving || !userId.trim()}>
+          {saving ? "Saving…" : "Assign Role"}
+        </Btn>
+      </ModalFoot>
+    </Modal>
   );
 }
 
 function SubjectTeacherTab({ subjectTeachers, subjects, teachers, isAdmin, showToast, invalidate, onAdd }: any) {
-  const [filterSubject, setFilterSubject] = useState('');
+  const [filterSubject, setFilterSubject] = useState("");
   const filtered = subjectTeachers.filter((st: any) => !filterSubject || st.subject_id === filterSubject);
 
   return (
-    <Card title="Subject → Teacher Mappings" titleRight={isAdmin && <Btn size="sm" onClick={onAdd}><i className="fas fa-plus mr-1" />Map Subject to Teacher</Btn>}>
+    <Card
+      title="Subject → Teacher Mappings"
+      titleRight={
+        isAdmin && (
+          <Btn size="sm" onClick={onAdd}>
+            <i className="fas fa-plus mr-1" />
+            Map Subject to Teacher
+          </Btn>
+        )
+      }
+    >
       <div className="mb-3">
-        <FilterSelect value={filterSubject} onChange={setFilterSubject} allLabel="All Subjects"
-          options={subjects.map((s: any) => ({ value: s.id, label: s.name }))} />
+        <FilterSelect
+          value={filterSubject}
+          onChange={setFilterSubject}
+          allLabel="All Subjects"
+          options={subjects.map((s: any) => ({ value: s.id, label: s.name }))}
+        />
       </div>
-      {filtered.length === 0 ? <div className="text-xs py-4 text-center" style={{ color: 'hsl(var(--text3))' }}>No mappings</div> : (
+      {filtered.length === 0 ? (
+        <div className="text-xs py-4 text-center" style={{ color: "hsl(var(--text3))" }}>
+          No mappings
+        </div>
+      ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
-            <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Subject', 'Code', 'Teacher', 'Department', 'Actions'].map(h => (
-                <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
-              ))}
-            </tr></thead>
+            <thead>
+              <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+                {["Subject", "Code", "Teacher", "Department", "Actions"].map((h) => (
+                  <th
+                    key={h}
+                    className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
             <tbody>
               {filtered.map((st: any) => (
-                <tr key={st.id} style={{ borderBottom: '1px solid #f6f8fa' }}>
+                <tr key={st.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
                   <td className="py-2.5 px-3.5 font-semibold">{st.subjects?.name}</td>
                   <td className="py-2.5 px-3.5 font-mono text-[11px]">{st.subjects?.code}</td>
                   <td className="py-2.5 px-3.5">{st.teachers?.name}</td>
                   <td className="py-2.5 px-3.5 text-[11px]">{st.teachers?.department}</td>
                   <td className="py-2.5 px-3.5">
-                    {isAdmin && <Btn variant="danger" size="sm" onClick={async () => {
-                      await supabase.from('subject_teachers').delete().eq('id', st.id);
-                      invalidate(['subject_teachers']);
-                      showToast('Removed');
-                    }}><i className="fas fa-trash" /></Btn>}
+                    {isAdmin && (
+                      <Btn
+                        variant="danger"
+                        size="sm"
+                        onClick={async () => {
+                          await supabase.from("subject_teachers").delete().eq("id", st.id);
+                          invalidate(["subject_teachers"]);
+                          showToast("Removed");
+                        }}
+                      >
+                        <i className="fas fa-trash" />
+                      </Btn>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -167,48 +1119,88 @@ function SubjectTeacherTab({ subjectTeachers, subjects, teachers, isAdmin, showT
 }
 
 function SubjectStudentTab({ studentSubjects, subjects, students, isAdmin, showToast, invalidate, onAdd }: any) {
-  const [filterSubject, setFilterSubject] = useState('');
-  const [filterForm, setFilterForm] = useState('');
-  const filtered = studentSubjects.filter((ss: any) =>
-    (!filterSubject || ss.subject_id === filterSubject) &&
-    (!filterForm || ss.students?.form === filterForm)
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterForm, setFilterForm] = useState("");
+  const filtered = studentSubjects.filter(
+    (ss: any) =>
+      (!filterSubject || ss.subject_id === filterSubject) && (!filterForm || ss.students?.form === filterForm),
   );
 
   return (
-    <Card title="Subject → Student Mappings" titleRight={isAdmin && <Btn size="sm" onClick={onAdd}><i className="fas fa-plus mr-1" />Map Subject to Students</Btn>}>
+    <Card
+      title="Subject → Student Mappings"
+      titleRight={
+        isAdmin && (
+          <Btn size="sm" onClick={onAdd}>
+            <i className="fas fa-plus mr-1" />
+            Map Subject to Students
+          </Btn>
+        )
+      }
+    >
       <div className="flex gap-2 mb-3">
-        <FilterSelect value={filterSubject} onChange={setFilterSubject} allLabel="All Subjects"
-          options={subjects.map((s: any) => ({ value: s.id, label: s.name }))} />
-        <FilterSelect value={filterForm} onChange={setFilterForm} allLabel="All Forms"
-          options={FORMS.map(f => ({ value: f, label: f }))} />
+        <FilterSelect
+          value={filterSubject}
+          onChange={setFilterSubject}
+          allLabel="All Subjects"
+          options={subjects.map((s: any) => ({ value: s.id, label: s.name }))}
+        />
+        <FilterSelect
+          value={filterForm}
+          onChange={setFilterForm}
+          allLabel="All Forms"
+          options={FORMS.map((f) => ({ value: f, label: f }))}
+        />
       </div>
-      {filtered.length === 0 ? <div className="text-xs py-4 text-center" style={{ color: 'hsl(var(--text3))' }}>No mappings</div> : (
+      {filtered.length === 0 ? (
+        <div className="text-xs py-4 text-center" style={{ color: "hsl(var(--text3))" }}>
+          No mappings
+        </div>
+      ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
-            <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Subject', 'Student', 'Form', 'Teacher', 'Actions'].map(h => (
-                <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
-              ))}
-            </tr></thead>
+            <thead>
+              <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+                {["Subject", "Student", "Form", "Teacher", "Actions"].map((h) => (
+                  <th
+                    key={h}
+                    className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
             <tbody>
               {filtered.slice(0, 100).map((ss: any) => (
-                <tr key={ss.id} style={{ borderBottom: '1px solid #f6f8fa' }}>
+                <tr key={ss.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
                   <td className="py-2.5 px-3.5 font-semibold">{ss.subjects?.name}</td>
                   <td className="py-2.5 px-3.5">{ss.students?.full_name}</td>
                   <td className="py-2.5 px-3.5 text-[11px]">{ss.students?.form}</td>
-                  <td className="py-2.5 px-3.5 text-[11px]">{ss.teachers?.name || '—'}</td>
+                  <td className="py-2.5 px-3.5 text-[11px]">{ss.teachers?.name || "—"}</td>
                   <td className="py-2.5 px-3.5">
-                    {isAdmin && <Btn variant="danger" size="sm" onClick={async () => {
-                      await supabase.from('student_subjects').delete().eq('id', ss.id);
-                      invalidate(['student_subjects']);
-                      showToast('Removed');
-                    }}><i className="fas fa-trash" /></Btn>}
+                    {isAdmin && (
+                      <Btn
+                        variant="danger"
+                        size="sm"
+                        onClick={async () => {
+                          await supabase.from("student_subjects").delete().eq("id", ss.id);
+                          invalidate(["student_subjects"]);
+                          showToast("Removed");
+                        }}
+                      >
+                        <i className="fas fa-trash" />
+                      </Btn>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="text-[11px] mt-2" style={{ color: 'hsl(var(--text2))' }}>{filtered.length} mappings</div>
+          <div className="text-[11px] mt-2" style={{ color: "hsl(var(--text2))" }}>
+            {filtered.length} mappings
+          </div>
         </div>
       )}
     </Card>
@@ -217,27 +1209,57 @@ function SubjectStudentTab({ studentSubjects, subjects, students, isAdmin, showT
 
 function ClassTeacherTab({ classTeachers, teachers, students, isAdmin, showToast, invalidate, onAdd }: any) {
   return (
-    <Card title="Class Teacher Assignments" titleRight={isAdmin && <Btn size="sm" onClick={onAdd}><i className="fas fa-plus mr-1" />Assign Class Teacher</Btn>}>
-      {classTeachers.length === 0 ? <div className="text-xs py-4 text-center" style={{ color: 'hsl(var(--text3))' }}>No class teachers assigned</div> : (
+    <Card
+      title="Class Teacher Assignments"
+      titleRight={
+        isAdmin && (
+          <Btn size="sm" onClick={onAdd}>
+            <i className="fas fa-plus mr-1" />
+            Assign Class Teacher
+          </Btn>
+        )
+      }
+    >
+      {classTeachers.length === 0 ? (
+        <div className="text-xs py-4 text-center" style={{ color: "hsl(var(--text3))" }}>
+          No class teachers assigned
+        </div>
+      ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12.5px]">
-            <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-              {['Form', 'Class', 'Teacher', 'Actions'].map(h => (
-                <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
-              ))}
-            </tr></thead>
+            <thead>
+              <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+                {["Form", "Class", "Teacher", "Actions"].map((h) => (
+                  <th
+                    key={h}
+                    className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase"
+                    style={{ color: "hsl(var(--text2))" }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
             <tbody>
               {classTeachers.map((ct: any) => (
-                <tr key={ct.id} style={{ borderBottom: '1px solid #f6f8fa' }}>
+                <tr key={ct.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
                   <td className="py-2.5 px-3.5 font-semibold">{ct.form}</td>
                   <td className="py-2.5 px-3.5">{ct.class_name}</td>
                   <td className="py-2.5 px-3.5">{ct.teachers?.name}</td>
                   <td className="py-2.5 px-3.5">
-                    {isAdmin && <Btn variant="danger" size="sm" onClick={async () => {
-                      await (supabase.from('class_teachers') as any).delete().eq('id', ct.id);
-                      invalidate(['class_teachers']);
-                      showToast('Removed');
-                    }}><i className="fas fa-trash" /></Btn>}
+                    {isAdmin && (
+                      <Btn
+                        variant="danger"
+                        size="sm"
+                        onClick={async () => {
+                          await (supabase.from("class_teachers") as any).delete().eq("id", ct.id);
+                          invalidate(["class_teachers"]);
+                          showToast("Removed");
+                        }}
+                      >
+                        <i className="fas fa-trash" />
+                      </Btn>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -251,29 +1273,41 @@ function ClassTeacherTab({ classTeachers, teachers, students, isAdmin, showToast
 
 // === Modals ===
 
-function RoleModal({ type, teachers, onClose }: { type: 'hod' | 'hoy'; teachers: any[]; onClose: () => void }) {
+function RoleModal({ type, teachers, onClose }: { type: "hod" | "hoy"; teachers: any[]; onClose: () => void }) {
   const { showToast } = useApp();
-  const [teacherId, setTeacherId] = useState('');
-  const [value, setValue] = useState('');
+  const [teacherId, setTeacherId] = useState("");
+  const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const departments = [...new Set(teachers.map((t: any) => t.department).filter(Boolean))].sort();
 
   const save = async () => {
     if (!teacherId || !value) return;
     setSaving(true);
-    if (type === 'hod') {
-      const { error } = await supabase.from('hod_assignments').insert({ teacher_id: teacherId, department: value });
-      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+    if (type === "hod") {
+      const { error } = await supabase.from("hod_assignments").insert({ teacher_id: teacherId, department: value });
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
       const teacher = teachers.find((t: any) => t.id === teacherId) as any;
       if (teacher?.user_id) {
-        await supabase.from('user_roles').upsert({ user_id: teacher.user_id, role: 'hod' }, { onConflict: 'user_id,role' });
+        await supabase
+          .from("user_roles")
+          .upsert({ user_id: teacher.user_id, role: "hod" }, { onConflict: "user_id,role" });
       }
     } else {
-      const { error } = await supabase.from('hoy_assignments').insert({ teacher_id: teacherId, form: value });
-      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+      const { error } = await supabase.from("hoy_assignments").insert({ teacher_id: teacherId, form: value });
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
       const teacher = teachers.find((t: any) => t.id === teacherId) as any;
       if (teacher?.user_id) {
-        await supabase.from('user_roles').upsert({ user_id: teacher.user_id, role: 'hoy' }, { onConflict: 'user_id,role' });
+        await supabase
+          .from("user_roles")
+          .upsert({ user_id: teacher.user_id, role: "hoy" }, { onConflict: "user_id,role" });
       }
     }
     showToast(`${type.toUpperCase()} assignment created`);
@@ -285,38 +1319,68 @@ function RoleModal({ type, teachers, onClose }: { type: 'hod' | 'hoy'; teachers:
       <ModalHead title={`Assign ${type.toUpperCase()}`} onClose={onClose} />
       <ModalBody>
         <Field label="Teacher" required>
-          <FieldSelect value={teacherId} onChange={setTeacherId}
-            options={[{ value: '', label: '— Select —' }, ...teachers.map((t: any) => ({ value: t.id, label: t.name }))]} />
+          <FieldSelect
+            value={teacherId}
+            onChange={setTeacherId}
+            options={[
+              { value: "", label: "— Select —" },
+              ...teachers.map((t: any) => ({ value: t.id, label: t.name })),
+            ]}
+          />
         </Field>
-        <Field label={type === 'hod' ? 'Department' : 'Form'} required>
-          <FieldSelect value={value} onChange={setValue}
-            options={[{ value: '', label: '— Select —' }, ...(type === 'hod' ? departments.map(d => ({ value: d, label: d })) : FORMS.map(f => ({ value: f, label: f })))]} />
+        <Field label={type === "hod" ? "Department" : "Form"} required>
+          <FieldSelect
+            value={value}
+            onChange={setValue}
+            options={[
+              { value: "", label: "— Select —" },
+              ...(type === "hod"
+                ? departments.map((d) => ({ value: d, label: d }))
+                : FORMS.map((f) => ({ value: f, label: f }))),
+            ]}
+          />
         </Field>
       </ModalBody>
       <ModalFoot>
-        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Assign'}</Btn>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Assign"}
+        </Btn>
       </ModalFoot>
     </Modal>
   );
 }
 
-function SubjectTeacherModal({ subjects, teachers, onClose }: { subjects: any[]; teachers: any[]; onClose: () => void }) {
+function SubjectTeacherModal({
+  subjects,
+  teachers,
+  onClose,
+}: {
+  subjects: any[];
+  teachers: any[];
+  onClose: () => void;
+}) {
   const { showToast } = useApp();
-  const [subjectId, setSubjectId] = useState('');
+  const [subjectId, setSubjectId] = useState("");
   const [teacherIds, setTeacherIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const toggleTeacher = (id: string) => {
-    setTeacherIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setTeacherIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const save = async () => {
     if (!subjectId || teacherIds.length === 0) return;
     setSaving(true);
-    const records = teacherIds.map(tid => ({ subject_id: subjectId, teacher_id: tid }));
-    const { error } = await supabase.from('subject_teachers').insert(records);
-    if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+    const records = teacherIds.map((tid) => ({ subject_id: subjectId, teacher_id: tid }));
+    const { error } = await supabase.from("subject_teachers").insert(records);
+    if (error) {
+      showToast(error.message, "error");
+      setSaving(false);
+      return;
+    }
     showToast(`${records.length} teacher(s) mapped to subject`);
     onClose();
   };
@@ -326,39 +1390,67 @@ function SubjectTeacherModal({ subjects, teachers, onClose }: { subjects: any[];
       <ModalHead title="Map Subject to Teachers" onClose={onClose} />
       <ModalBody>
         <Field label="Subject" required>
-          <FieldSelect value={subjectId} onChange={setSubjectId}
-            options={[{ value: '', label: '— Select Subject —' }, ...subjects.map((s: any) => ({ value: s.id, label: `${s.name} (${s.code})` }))]} />
+          <FieldSelect
+            value={subjectId}
+            onChange={setSubjectId}
+            options={[
+              { value: "", label: "— Select Subject —" },
+              ...subjects.map((s: any) => ({ value: s.id, label: `${s.name} (${s.code})` })),
+            ]}
+          />
         </Field>
         <Field label="Select Teachers" required>
-          <div className="max-h-[250px] overflow-y-auto border rounded-md p-2" style={{ borderColor: 'hsl(var(--border))' }}>
+          <div
+            className="max-h-[250px] overflow-y-auto border rounded-md p-2"
+            style={{ borderColor: "hsl(var(--border))" }}
+          >
             {teachers.map((t: any) => (
-              <label key={t.id} className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-[hsl(var(--surface2))] text-[12px]">
+              <label
+                key={t.id}
+                className="flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer hover:bg-[hsl(var(--surface2))] text-[12px]"
+              >
                 <input type="checkbox" checked={teacherIds.includes(t.id)} onChange={() => toggleTeacher(t.id)} />
                 <span className="font-semibold">{t.name}</span>
-                <span className="text-[10px]" style={{ color: 'hsl(var(--text3))' }}>{t.department}</span>
+                <span className="text-[10px]" style={{ color: "hsl(var(--text3))" }}>
+                  {t.department}
+                </span>
               </label>
             ))}
           </div>
-          <div className="text-[10px] mt-1" style={{ color: 'hsl(var(--text3))' }}>{teacherIds.length} selected</div>
+          <div className="text-[10px] mt-1" style={{ color: "hsl(var(--text3))" }}>
+            {teacherIds.length} selected
+          </div>
         </Field>
       </ModalBody>
       <ModalFoot>
-        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Map Teachers'}</Btn>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Map Teachers"}
+        </Btn>
       </ModalFoot>
     </Modal>
   );
 }
 
-function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[]; students: any[]; onClose: () => void }) {
+function SubjectStudentModal({
+  subjects,
+  students,
+  onClose,
+}: {
+  subjects: any[];
+  students: any[];
+  onClose: () => void;
+}) {
   const { showToast } = useApp();
   const { data: subjectTeachersAll = [] } = useSubjectTeachers();
   const { data: existingStudentSubjects = [] } = useStudentSubjects();
-  const [subjectId, setSubjectId] = useState('');
-  const [selectedTeacherId, setSelectedTeacherId] = useState('');
-  const [filterForm, setFilterForm] = useState('Form 1');
-  const [filterClass, setFilterClass] = useState('');
-  const [searchStr, setSearchStr] = useState('');
+  const [subjectId, setSubjectId] = useState("");
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [filterForm, setFilterForm] = useState("Form 1");
+  const [filterClass, setFilterClass] = useState("");
+  const [searchStr, setSearchStr] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -374,35 +1466,48 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
   // Students already mapped to this subject
   const alreadyMappedIds = useMemo(() => {
     if (!subjectId) return new Set<string>();
-    return new Set(existingStudentSubjects.filter((ss: any) => ss.subject_id === subjectId).map((ss: any) => ss.student_id));
+    return new Set(
+      existingStudentSubjects.filter((ss: any) => ss.subject_id === subjectId).map((ss: any) => ss.student_id),
+    );
   }, [subjectId, existingStudentSubjects]);
 
   // Available classes for current form
   const availableClasses = useMemo(() => {
-    return [...new Set(students.filter((s: any) => s.form === filterForm && s.state === 'active').map((s: any) => s.class_name).filter(Boolean))].sort();
+    return [
+      ...new Set(
+        students
+          .filter((s: any) => s.form === filterForm && s.state === "active")
+          .map((s: any) => s.class_name)
+          .filter(Boolean),
+      ),
+    ].sort();
   }, [students, filterForm]);
 
   const formStudents = useMemo(() => {
-    return students.filter((s: any) =>
-      s.form === filterForm && s.state === 'active' &&
-      (!filterClass || s.class_name === filterClass) &&
-      (!searchStr || s.full_name.toLowerCase().includes(searchStr.toLowerCase()) || (s.enrollment_number || '').toLowerCase().includes(searchStr.toLowerCase()))
+    return students.filter(
+      (s: any) =>
+        s.form === filterForm &&
+        s.state === "active" &&
+        (!filterClass || s.class_name === filterClass) &&
+        (!searchStr ||
+          s.full_name.toLowerCase().includes(searchStr.toLowerCase()) ||
+          (s.enrollment_number || "").toLowerCase().includes(searchStr.toLowerCase())),
     );
   }, [students, filterForm, filterClass, searchStr]);
 
   // Split into unmapped and already-mapped
-  const unmappedStudents = formStudents.filter(s => !alreadyMappedIds.has(s.id));
-  const mappedStudents = formStudents.filter(s => alreadyMappedIds.has(s.id));
+  const unmappedStudents = formStudents.filter((s) => !alreadyMappedIds.has(s.id));
+  const mappedStudents = formStudents.filter((s) => alreadyMappedIds.has(s.id));
 
   const toggleStudent = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const selectAll = () => {
     const ids = unmappedStudents.map((s: any) => s.id);
-    setSelectedIds(prev => {
-      const allSelected = ids.every(id => prev.includes(id));
-      if (allSelected) return prev.filter(id => !ids.includes(id));
+    setSelectedIds((prev) => {
+      const allSelected = ids.every((id) => prev.includes(id));
+      if (allSelected) return prev.filter((id) => !ids.includes(id));
       return [...new Set([...prev, ...ids])];
     });
   };
@@ -410,11 +1515,19 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
   const save = async () => {
     if (!subjectId || selectedIds.length === 0) return;
     setSaving(true);
-    const records = selectedIds.map(sid => ({ subject_id: subjectId, student_id: sid, teacher_id: selectedTeacherId || null }));
+    const records = selectedIds.map((sid) => ({
+      subject_id: subjectId,
+      student_id: sid,
+      teacher_id: selectedTeacherId || null,
+    }));
     for (let i = 0; i < records.length; i += 50) {
       const batch = records.slice(i, i + 50);
-      const { error } = await supabase.from('student_subjects').insert(batch);
-      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+      const { error } = await supabase.from("student_subjects").insert(batch);
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
     }
     showToast(`${records.length} student(s) mapped to subject`);
     onClose();
@@ -428,26 +1541,50 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
       <ModalBody>
         {/* Step 1: Select Subject */}
         <div className="mb-4">
-          <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
-            <i className="fas fa-book mr-1.5" />Step 1 — Select Subject
+          <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "hsl(var(--text2))" }}>
+            <i className="fas fa-book mr-1.5" />
+            Step 1 — Select Subject
           </div>
-          <FieldSelect value={subjectId} onChange={v => { setSubjectId(v); setSelectedTeacherId(''); setSelectedIds([]); }}
-            options={[{ value: '', label: '— Select Subject —' }, ...subjects.map((s: any) => ({ value: s.id, label: `${s.name} (${s.code || ''})` }))]} />
+          <FieldSelect
+            value={subjectId}
+            onChange={(v) => {
+              setSubjectId(v);
+              setSelectedTeacherId("");
+              setSelectedIds([]);
+            }}
+            options={[
+              { value: "", label: "— Select Subject —" },
+              ...subjects.map((s: any) => ({ value: s.id, label: `${s.name} (${s.code || ""})` })),
+            ]}
+          />
         </div>
 
         {/* Step 2: Select Teacher */}
         {subjectId && (
           <div className="mb-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
-              <i className="fas fa-chalkboard-teacher mr-1.5" />Step 2 — Select Teacher for {selectedSubject?.name}
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "hsl(var(--text2))" }}>
+              <i className="fas fa-chalkboard-teacher mr-1.5" />
+              Step 2 — Select Teacher for {selectedSubject?.name}
             </div>
             {matchedTeachers.length === 0 ? (
-              <div className="text-[11px] p-3 rounded-lg" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text3))' }}>
+              <div
+                className="text-[11px] p-3 rounded-lg"
+                style={{ background: "hsl(var(--surface2))", color: "hsl(var(--text3))" }}
+              >
                 No teachers assigned to this subject yet. Map a teacher in Subject → Teacher first.
               </div>
             ) : (
-              <FieldSelect value={selectedTeacherId} onChange={setSelectedTeacherId}
-                options={[{ value: '', label: '— Select Teacher —' }, ...matchedTeachers.map((t: any) => ({ value: t.id, label: `${t.name}${t.department ? ` (${t.department})` : ''}` }))]} />
+              <FieldSelect
+                value={selectedTeacherId}
+                onChange={setSelectedTeacherId}
+                options={[
+                  { value: "", label: "— Select Teacher —" },
+                  ...matchedTeachers.map((t: any) => ({
+                    value: t.id,
+                    label: `${t.name}${t.department ? ` (${t.department})` : ""}`,
+                  })),
+                ]}
+              />
             )}
           </div>
         )}
@@ -455,65 +1592,123 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
         {/* Step 2: Select Students */}
         {subjectId && selectedTeacherId && (
           <>
-            <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: 'hsl(var(--text2))' }}>
-              <i className="fas fa-users mr-1.5" />Step 3 — Select Students
+            <div className="text-[11px] font-bold uppercase tracking-wide mb-2" style={{ color: "hsl(var(--text2))" }}>
+              <i className="fas fa-users mr-1.5" />
+              Step 3 — Select Students
             </div>
             <div className="flex gap-2 mb-3">
-              <FieldSelect value={filterForm} onChange={v => { setFilterForm(v); setFilterClass(''); setSelectedIds([]); }}
-                options={FORMS.map(f => ({ value: f, label: f }))} />
-              <FieldSelect value={filterClass} onChange={setFilterClass}
-                options={[{ value: '', label: 'All Classes' }, ...availableClasses.map(c => ({ value: c, label: c }))]} />
+              <FieldSelect
+                value={filterForm}
+                onChange={(v) => {
+                  setFilterForm(v);
+                  setFilterClass("");
+                  setSelectedIds([]);
+                }}
+                options={FORMS.map((f) => ({ value: f, label: f }))}
+              />
+              <FieldSelect
+                value={filterClass}
+                onChange={setFilterClass}
+                options={[
+                  { value: "", label: "All Classes" },
+                  ...availableClasses.map((c) => ({ value: c, label: c })),
+                ]}
+              />
               <input
                 className="flex-1 h-[34px] rounded-md border px-3 text-[12px]"
-                style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--surface1))' }}
+                style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface1))" }}
                 placeholder="🔍 Search student name or enrollment..."
-                value={searchStr} onChange={e => setSearchStr(e.target.value)}
+                value={searchStr}
+                onChange={(e) => setSearchStr(e.target.value)}
               />
             </div>
 
             <div className="flex justify-between items-center mb-2">
-              <div className="text-[11px] font-semibold" style={{ color: 'hsl(var(--text2))' }}>
+              <div className="text-[11px] font-semibold" style={{ color: "hsl(var(--text2))" }}>
                 {unmappedStudents.length} available · {mappedStudents.length} already mapped
               </div>
               <Btn variant="outline" size="sm" onClick={selectAll}>
-                {unmappedStudents.length > 0 && unmappedStudents.every(s => selectedIds.includes(s.id)) ? 'Deselect All' : 'Select All'}
+                {unmappedStudents.length > 0 && unmappedStudents.every((s) => selectedIds.includes(s.id))
+                  ? "Deselect All"
+                  : "Select All"}
               </Btn>
             </div>
 
-            <div className="max-h-[280px] overflow-y-auto border rounded-md" style={{ borderColor: 'hsl(var(--border))' }}>
+            <div
+              className="max-h-[280px] overflow-y-auto border rounded-md"
+              style={{ borderColor: "hsl(var(--border))" }}
+            >
               {unmappedStudents.length === 0 && mappedStudents.length === 0 && (
-                <div className="py-6 text-center text-[11px]" style={{ color: 'hsl(var(--text3))' }}>No students found</div>
+                <div className="py-6 text-center text-[11px]" style={{ color: "hsl(var(--text3))" }}>
+                  No students found
+                </div>
               )}
               {unmappedStudents.map((s: any) => (
-                <label key={s.id} className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-[hsl(var(--surface2))] text-[12px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
-                  <input type="checkbox" checked={selectedIds.includes(s.id)} onChange={() => toggleStudent(s.id)} className="accent-[#1a3fa0]" />
+                <label
+                  key={s.id}
+                  className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-[hsl(var(--surface2))] text-[12px]"
+                  style={{ borderBottom: "1px solid #f6f8fa" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(s.id)}
+                    onChange={() => toggleStudent(s.id)}
+                    className="accent-[#1a3fa0]"
+                  />
                   <span className="font-semibold flex-1">{s.full_name}</span>
-                  <span className="text-[10px] font-mono" style={{ color: 'hsl(var(--text3))' }}>{s.enrollment_number || '—'}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text2))' }}>{s.class_name || '—'}</span>
+                  <span className="text-[10px] font-mono" style={{ color: "hsl(var(--text3))" }}>
+                    {s.enrollment_number || "—"}
+                  </span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded"
+                    style={{ background: "hsl(var(--surface2))", color: "hsl(var(--text2))" }}
+                  >
+                    {s.class_name || "—"}
+                  </span>
                 </label>
               ))}
               {mappedStudents.length > 0 && (
                 <>
-                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text3))' }}>Already Mapped</div>
+                  <div
+                    className="px-3 py-1.5 text-[10px] font-bold uppercase"
+                    style={{ background: "hsl(var(--surface2))", color: "hsl(var(--text3))" }}
+                  >
+                    Already Mapped
+                  </div>
                   {mappedStudents.map((s: any) => (
-                    <div key={s.id} className="flex items-center gap-2 py-2 px-3 text-[12px] opacity-50" style={{ borderBottom: '1px solid #f6f8fa' }}>
-                      <i className="fas fa-check text-[10px]" style={{ color: '#1a7f37' }} />
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-2 py-2 px-3 text-[12px] opacity-50"
+                      style={{ borderBottom: "1px solid #f6f8fa" }}
+                    >
+                      <i className="fas fa-check text-[10px]" style={{ color: "#1a7f37" }} />
                       <span className="flex-1">{s.full_name}</span>
-                      <span className="text-[10px] font-mono" style={{ color: 'hsl(var(--text3))' }}>{s.enrollment_number || '—'}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'hsl(var(--surface2))', color: 'hsl(var(--text2))' }}>{s.class_name || '—'}</span>
+                      <span className="text-[10px] font-mono" style={{ color: "hsl(var(--text3))" }}>
+                        {s.enrollment_number || "—"}
+                      </span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded"
+                        style={{ background: "hsl(var(--surface2))", color: "hsl(var(--text2))" }}
+                      >
+                        {s.class_name || "—"}
+                      </span>
                     </div>
                   ))}
                 </>
               )}
             </div>
-            <div className="text-[10px] mt-1.5" style={{ color: 'hsl(var(--text3))' }}>{selectedIds.length} student(s) selected for mapping</div>
+            <div className="text-[10px] mt-1.5" style={{ color: "hsl(var(--text3))" }}>
+              {selectedIds.length} student(s) selected for mapping
+            </div>
           </>
         )}
       </ModalBody>
       <ModalFoot>
-        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
         <Btn onClick={save} disabled={saving || selectedIds.length === 0}>
-          {saving ? 'Mapping…' : `Map ${selectedIds.length} Student${selectedIds.length !== 1 ? 's' : ''}`}
+          {saving ? "Mapping…" : `Map ${selectedIds.length} Student${selectedIds.length !== 1 ? "s" : ""}`}
         </Btn>
       </ModalFoot>
     </Modal>
@@ -522,19 +1717,34 @@ function SubjectStudentModal({ subjects, students, onClose }: { subjects: any[];
 
 function ClassTeacherModal({ teachers, students, onClose }: { teachers: any[]; students: any[]; onClose: () => void }) {
   const { showToast } = useApp();
-  const [teacherId, setTeacherId] = useState('');
-  const [form, setForm] = useState('Form 1');
-  const [className, setClassName] = useState('');
+  const [teacherId, setTeacherId] = useState("");
+  const [form, setForm] = useState("Form 1");
+  const [className, setClassName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const classes = [...new Set(students.filter((s: any) => s.form === form).map((s: any) => s.class_name).filter(Boolean))].sort();
+  const classes = [
+    ...new Set(
+      students
+        .filter((s: any) => s.form === form)
+        .map((s: any) => s.class_name)
+        .filter(Boolean),
+    ),
+  ].sort();
 
   const save = async () => {
     if (!teacherId || !form || !className) return;
     setSaving(true);
-    const { error } = await (supabase.from('class_teachers') as any).insert({ teacher_id: teacherId, form, class_name: className });
-    if (error) { showToast(error.message, 'error'); setSaving(false); return; }
-    showToast('Class teacher assigned');
+    const { error } = await (supabase.from("class_teachers") as any).insert({
+      teacher_id: teacherId,
+      form,
+      class_name: className,
+    });
+    if (error) {
+      showToast(error.message, "error");
+      setSaving(false);
+      return;
+    }
+    showToast("Class teacher assigned");
     onClose();
   };
 
@@ -543,22 +1753,35 @@ function ClassTeacherModal({ teachers, students, onClose }: { teachers: any[]; s
       <ModalHead title="Assign Class Teacher" onClose={onClose} />
       <ModalBody>
         <Field label="Teacher" required>
-          <FieldSelect value={teacherId} onChange={setTeacherId}
-            options={[{ value: '', label: '— Select —' }, ...teachers.map((t: any) => ({ value: t.id, label: t.name }))]} />
+          <FieldSelect
+            value={teacherId}
+            onChange={setTeacherId}
+            options={[
+              { value: "", label: "— Select —" },
+              ...teachers.map((t: any) => ({ value: t.id, label: t.name })),
+            ]}
+          />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Form" required>
-            <FieldSelect value={form} onChange={setForm} options={FORMS.map(f => ({ value: f, label: f }))} />
+            <FieldSelect value={form} onChange={setForm} options={FORMS.map((f) => ({ value: f, label: f }))} />
           </Field>
           <Field label="Class" required>
-            <FieldSelect value={className} onChange={setClassName}
-              options={[{ value: '', label: '— Select —' }, ...classes.map(c => ({ value: c, label: c }))]} />
+            <FieldSelect
+              value={className}
+              onChange={setClassName}
+              options={[{ value: "", label: "— Select —" }, ...classes.map((c) => ({ value: c, label: c }))]}
+            />
           </Field>
         </div>
       </ModalBody>
       <ModalFoot>
-        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Assign'}</Btn>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Assign"}
+        </Btn>
       </ModalFoot>
     </Modal>
   );
