@@ -1163,10 +1163,10 @@ function UserRoleModal({
 }) {
   const { showToast } = useApp();
   const invalidate = useInvalidate();
-  const isEdit = existing.id !== "";
+  const isEdit = existing !== false && existing.id !== "";
 
-  const [selectedUserId, setSelectedUserId] = useState(isEdit ? existing.user_id : "");
-  const [role, setRole] = useState<AppRole>(isEdit ? (existing.role as AppRole) : "student");
+  const [selectedUserId, setSelectedUserId] = useState(isEdit && existing ? existing.user_id : "");
+  const [role, setRole] = useState<AppRole>(isEdit && existing ? (existing.role as AppRole) : "student");
   const [saving, setSaving] = useState(false);
 
   const selectedProfile = profiles.find((p: any) => p.user_id === selectedUserId);
@@ -1176,7 +1176,7 @@ function UserRoleModal({
     setSaving(true);
     if (isEdit) {
       // Update: delete old + insert new (role is part of unique key so can't update in place)
-      await supabase.from("user_roles").delete().eq("id", existing.id);
+      await supabase.from("user_roles").delete().eq("id", (existing as any).id);
       const { error } = (await supabase
         .from("user_roles")
         .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
@@ -1204,7 +1204,7 @@ function UserRoleModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
+      <ModalHead title={isEdit && existing ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
         {!isEdit && (
           <Field label="User" required>
@@ -1230,9 +1230,9 @@ function UserRoleModal({
             className="rounded-md px-3 py-2.5 mb-3 text-[12px]"
             style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
           >
-            <div className="font-semibold">{existing.name}</div>
+            <div className="font-semibold">{isEdit ? (existing as any).name : ""}</div>
             <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text2))" }}>
-              Current role: <span className="font-semibold">{existing.role}</span>
+              Current role: <span className="font-semibold">{isEdit ? (existing as any).role : ""}</span>
             </div>
           </div>
         )}
