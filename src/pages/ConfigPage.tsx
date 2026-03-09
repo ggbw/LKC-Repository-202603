@@ -12,6 +12,8 @@ import {
   useAcademicYears,
   useForms,
   useUserRoles,
+  useClasses,
+  useProfiles,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
@@ -204,7 +206,9 @@ function GeneralTab({
 }: any) {
   const { data: academicYears = [] } = useAcademicYears();
   const { data: forms = [] } = useForms();
+  const { data: classes = [] } = useClasses();
   const { data: userRoles = [] } = useUserRoles();
+  const { data: profiles = [] } = useProfiles();
 
   // ── Academic Years state ──
   const [newYear, setNewYear] = useState("");
@@ -223,8 +227,16 @@ function GeneralTab({
   const [editForm, setEditForm] = useState<any>(null);
   const [savingForm, setSavingForm] = useState(false);
 
+  // ── Classes state ──
+  const [newClassName, setNewClassName] = useState("");
+  const [newClassForm, setNewClassForm] = useState("Form 1");
+  const [editClass, setEditClass] = useState<any>(null);
+  const [savingClass, setSavingClass] = useState(false);
+
   // ── User Roles state ──
-  const [userRoleModal, setUserRoleModal] = useState(false);
+  const [userRoleModal, setUserRoleModal] = useState<
+    false | { id: string; user_id: string; role: string; name: string }
+  >(false);
 
   // Group roles by user
   const rolesByUser = useMemo(() => {
@@ -320,6 +332,48 @@ function GeneralTab({
     } else {
       showToast(`Subject "${name}" deleted`);
       invalidate(["subjects"]);
+    }
+  };
+
+  // ── Class actions ──
+  const addClassEntry = async () => {
+    if (!newClassName.trim()) return;
+    setSavingClass(true);
+    const { error } = await (supabase as any).from("classes").insert({ form: newClassForm, name: newClassName.trim() });
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Class "${newClassName}" added`);
+      invalidate(["classes"]);
+      setNewClassName("");
+    }
+    setSavingClass(false);
+  };
+  const updateClass = async () => {
+    if (!editClass) return;
+    setSavingClass(true);
+    const { error } = await (supabase as any)
+      .from("classes")
+      .update({ form: editClass.form, name: editClass.name })
+      .eq("id", editClass.id);
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Class updated");
+      invalidate(["classes"]);
+      setEditClass(null);
+    }
+    setSavingClass(false);
+  };
+  const deleteClass = async (id: string, name: string) => {
+    if (!confirm(`Delete class "${name}"? Students will be unassigned.`)) return;
+    await (supabase as any).from("students").update({ class_name: null }).eq("class_name", name);
+    const { error } = await (supabase as any).from("classes").delete().eq("id", id);
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Class "${name}" deleted`);
+      invalidate(["classes", "students"]);
     }
   };
 
@@ -710,19 +764,155 @@ function GeneralTab({
         )}
       </Card>
 
+      {/* ══ Classes ══ */}
+      <Card
+        title={
+          <>
+            <i className="fas fa-layer-group mr-1.5" />
+            Classes ({classes.length})
+          </>
+        }
+      >
+        <table className="w-full border-collapse text-[12.5px] mb-3">
+          <thead>
+            <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+              {["Form", "Class Name", "Students", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+                <th
+                  key={h}
+                  className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
+                  style={{ color: "hsl(var(--text2))" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {classes.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-4 text-center text-xs" style={{ color: "hsl(var(--text3))" }}>
+                  No classes yet
+                </td>
+              </tr>
+            )}
+            {classes.map((c: any) => (
+              <tr key={c.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                {editClass?.id === c.id ? (
+                  <>
+                    <td className="py-1.5 px-3">
+                      <select
+                        className="border rounded px-2 py-1 text-[12px]"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editClass.form}
+                        onChange={(e) => setEditClass({ ...editClass, form: e.target.value })}
+                      >
+                        {FORMS.map((f) => (
+                          <option key={f} value={f}>
+                            {f}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <input
+                        className="border rounded px-2 py-1 text-[12px] w-24"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editClass.name}
+                        onChange={(e) => setEditClass({ ...editClass, name: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3" />
+                    <td className="py-1.5 px-3">
+                      <div className="flex gap-1">
+                        <Btn size="sm" onClick={updateClass} disabled={savingClass}>
+                          {savingClass ? "…" : "Save"}
+                        </Btn>
+                        <Btn variant="outline" size="sm" onClick={() => setEditClass(null)}>
+                          Cancel
+                        </Btn>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-2 px-3 text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                      {c.form}
+                    </td>
+                    <td className="py-2 px-3 font-semibold">{c.name}</td>
+                    <td className="py-2 px-3 font-mono text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                      {subjects.length > 0 ? "—" : "—"}
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1">
+                          <Btn variant="outline" size="sm" onClick={() => setEditClass({ ...c })}>
+                            <i className="fas fa-edit" />
+                          </Btn>
+                          <Btn variant="danger" size="sm" onClick={() => deleteClass(c.id, c.name)}>
+                            <i className="fas fa-trash" />
+                          </Btn>
+                        </div>
+                      </td>
+                    )}
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {isAdmin && (
+          <div className="flex gap-2 items-end pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+            <div>
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Form
+              </div>
+              <select
+                className="border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                value={newClassForm}
+                onChange={(e) => setNewClassForm(e.target.value)}
+              >
+                {FORMS.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Class Name
+              </div>
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                placeholder="e.g. 5B, Mango, North…"
+                value={newClassName}
+                onChange={(e) => setNewClassName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addClassEntry()}
+              />
+            </div>
+            <Btn onClick={addClassEntry} disabled={savingClass || !newClassName.trim()}>
+              <i className="fas fa-plus mr-1" />
+              {savingClass ? "Adding…" : "Add Class"}
+            </Btn>
+          </div>
+        )}
+      </Card>
+
       {/* ══ User Roles ══ */}
       <Card
         title={
           <>
             <i className="fas fa-user-shield mr-1.5" />
-            User Roles
+            User Roles ({userRoles.length})
           </>
         }
         titleRight={
           isAdmin && (
-            <Btn size="sm" onClick={() => setUserRoleModal(true)}>
+            <Btn size="sm" onClick={() => setUserRoleModal({ id: "", user_id: "", role: "student", name: "" })}>
               <i className="fas fa-plus mr-1" />
-              Manage Roles
+              Assign Role
             </Btn>
           )
         }
@@ -735,7 +925,7 @@ function GeneralTab({
           <table className="w-full border-collapse text-[12.5px]">
             <thead>
               <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
-                {["User ID", "Role", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+                {["User", "Email", "Role", ...(isAdmin ? ["Actions"] : [])].map((h) => (
                   <th
                     key={h}
                     className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
@@ -747,54 +937,80 @@ function GeneralTab({
               </tr>
             </thead>
             <tbody>
-              {userRoles.map((r: any) => (
-                <tr key={r.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
-                  <td className="py-2 px-3 font-mono text-[10px]" style={{ color: "hsl(var(--text2))" }}>
-                    {r.user_id}
-                  </td>
-                  <td className="py-2 px-3">
-                    <span
-                      className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                      style={{
-                        background:
-                          r.role === "admin"
-                            ? "#ffeef0"
-                            : r.role === "teacher"
-                              ? "#ddf4ff"
-                              : r.role === "student"
-                                ? "#dafbe1"
-                                : "#fff8c5",
-                        color:
-                          r.role === "admin"
-                            ? "#cf222e"
-                            : r.role === "teacher"
-                              ? "#0969da"
-                              : r.role === "student"
-                                ? "#1a7f37"
-                                : "#9a6700",
-                      }}
-                    >
-                      {r.role}
-                    </span>
-                  </td>
-                  {isAdmin && (
+              {userRoles.map((r: any) => {
+                const profile = profiles.find((p: any) => p.user_id === r.user_id);
+                return (
+                  <tr key={r.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                    <td className="py-2 px-3 font-semibold">
+                      {profile?.full_name || (
+                        <span className="font-mono text-[10px]" style={{ color: "hsl(var(--text3))" }}>
+                          {r.user_id.slice(0, 12)}…
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                      {profile?.email || "—"}
+                    </td>
                     <td className="py-2 px-3">
-                      <Btn
-                        variant="danger"
-                        size="sm"
-                        onClick={async () => {
-                          if (!confirm(`Remove ${r.role} role?`)) return;
-                          await supabase.from("user_roles").delete().eq("id", r.id);
-                          invalidate(["user_roles"]);
-                          showToast("Role removed");
+                      <span
+                        className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                        style={{
+                          background:
+                            r.role === "admin"
+                              ? "#ffeef0"
+                              : r.role === "teacher"
+                                ? "#ddf4ff"
+                                : r.role === "student"
+                                  ? "#dafbe1"
+                                  : "#fff8c5",
+                          color:
+                            r.role === "admin"
+                              ? "#cf222e"
+                              : r.role === "teacher"
+                                ? "#0969da"
+                                : r.role === "student"
+                                  ? "#1a7f37"
+                                  : "#9a6700",
                         }}
                       >
-                        <i className="fas fa-trash" />
-                      </Btn>
+                        {r.role}
+                      </span>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    {isAdmin && (
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1">
+                          <Btn
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setUserRoleModal({
+                                id: r.id,
+                                user_id: r.user_id,
+                                role: r.role,
+                                name: profile?.full_name || r.user_id,
+                              })
+                            }
+                          >
+                            <i className="fas fa-edit" />
+                          </Btn>
+                          <Btn
+                            variant="danger"
+                            size="sm"
+                            onClick={async () => {
+                              if (!confirm(`Remove ${r.role} role from ${profile?.full_name || "this user"}?`)) return;
+                              await supabase.from("user_roles").delete().eq("id", r.id);
+                              invalidate(["user_roles"]);
+                              showToast("Role removed");
+                            }}
+                          >
+                            <i className="fas fa-trash" />
+                          </Btn>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -900,8 +1116,10 @@ function GeneralTab({
         </Card>
       </div>
 
-      {userRoleModal && (
+      {userRoleModal !== false && (
         <UserRoleModal
+          existing={userRoleModal}
+          profiles={profiles}
           onClose={() => {
             setUserRoleModal(false);
             invalidate(["user_roles"]);
@@ -914,50 +1132,91 @@ function GeneralTab({
 
 // ─── User Role Modal ──────────────────────────────────────────────────────────
 
-function UserRoleModal({ onClose }: { onClose: () => void }) {
+function UserRoleModal({
+  existing,
+  profiles,
+  onClose,
+}: {
+  existing: { id: string; user_id: string; role: string; name: string } | false;
+  profiles: any[];
+  onClose: () => void;
+}) {
   const { showToast } = useApp();
-  const { data: userRoles = [] } = useUserRoles();
   const invalidate = useInvalidate();
-  const [userId, setUserId] = useState("");
-  const [role, setRole] = useState<AppRole>("student");
+  const isEdit = existing.id !== "";
+
+  const [selectedUserId, setSelectedUserId] = useState(isEdit ? existing.user_id : "");
+  const [role, setRole] = useState<AppRole>(isEdit ? (existing.role as AppRole) : "student");
   const [saving, setSaving] = useState(false);
 
+  const selectedProfile = profiles.find((p: any) => p.user_id === selectedUserId);
+
   const save = async () => {
-    if (!userId.trim() || !role) return;
+    if (!selectedUserId || !role) return;
     setSaving(true);
-    const { error } = (await supabase
-      .from("user_roles")
-      .upsert({ user_id: userId.trim(), role }, { onConflict: "user_id,role" })) as any;
-    if (error) {
-      showToast(error.message, "error");
+    if (isEdit) {
+      // Update: delete old + insert new (role is part of unique key so can't update in place)
+      await supabase.from("user_roles").delete().eq("id", existing.id);
+      const { error } = (await supabase
+        .from("user_roles")
+        .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
+      showToast(`Role updated to "${role}"`);
     } else {
-      showToast(`Role "${role}" assigned`);
-      invalidate(["user_roles"]);
-      setUserId("");
+      const { error } = (await supabase
+        .from("user_roles")
+        .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
+      showToast(`Role "${role}" assigned to ${selectedProfile?.full_name || "user"}`);
     }
+    invalidate(["user_roles"]);
     setSaving(false);
+    onClose();
   };
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title="Manage User Role" onClose={onClose} />
+      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
-        <div
-          className="rounded-md px-3 py-2 mb-3 text-[11px]"
-          style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
-        >
-          <i className="fas fa-info-circle mr-1" />
-          Enter the user's UUID from Supabase Auth. You can find this in the User Management page or Supabase dashboard.
-        </div>
-        <Field label="User ID (UUID)" required>
-          <input
-            className="w-full border rounded-md py-[7px] px-3 text-[12px] font-mono"
-            style={{ borderColor: "hsl(var(--border))" }}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-          />
-        </Field>
+        {!isEdit && (
+          <Field label="User" required>
+            <select
+              className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+              style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+            >
+              <option value="">— Select user —</option>
+              {profiles.map((p: any) => (
+                <option key={p.user_id} value={p.user_id}>
+                  {p.full_name}
+                  {p.email ? ` (${p.email})` : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        {isEdit && (
+          <div
+            className="rounded-md px-3 py-2.5 mb-3 text-[12px]"
+            style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
+          >
+            <div className="font-semibold">{existing.name}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text2))" }}>
+              Current role: <span className="font-semibold">{existing.role}</span>
+            </div>
+          </div>
+        )}
+
         <Field label="Role" required>
           <FieldSelect
             value={role}
@@ -966,76 +1225,22 @@ function UserRoleModal({ onClose }: { onClose: () => void }) {
           />
         </Field>
 
-        {/* Existing roles table */}
-        {userRoles.length > 0 && (
-          <div className="mt-4">
-            <div className="text-[11px] font-semibold mb-2" style={{ color: "hsl(var(--text2))" }}>
-              Current Role Assignments
-            </div>
-            <div
-              className="max-h-[200px] overflow-y-auto rounded-lg"
-              style={{ border: "1px solid hsl(var(--border))" }}
-            >
-              {userRoles.map((r: any, i: number) => (
-                <div
-                  key={r.id}
-                  className="flex items-center justify-between px-3 py-2 text-[12px]"
-                  style={{
-                    borderBottom: i < userRoles.length - 1 ? "1px solid #f6f8fa" : "none",
-                    background: i % 2 === 0 ? "#fff" : "hsl(var(--surface2))",
-                  }}
-                >
-                  <div>
-                    <span className="font-mono text-[10px]" style={{ color: "hsl(var(--text3))" }}>
-                      {r.user_id.slice(0, 16)}…
-                    </span>
-                    <span
-                      className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                      style={{
-                        background:
-                          r.role === "admin"
-                            ? "#ffeef0"
-                            : r.role === "teacher"
-                              ? "#ddf4ff"
-                              : r.role === "student"
-                                ? "#dafbe1"
-                                : "#fff8c5",
-                        color:
-                          r.role === "admin"
-                            ? "#cf222e"
-                            : r.role === "teacher"
-                              ? "#0969da"
-                              : r.role === "student"
-                                ? "#1a7f37"
-                                : "#9a6700",
-                      }}
-                    >
-                      {r.role}
-                    </span>
-                  </div>
-                  <Btn
-                    variant="danger"
-                    size="sm"
-                    onClick={async () => {
-                      await supabase.from("user_roles").delete().eq("id", r.id);
-                      invalidate(["user_roles"]);
-                      showToast("Role removed");
-                    }}
-                  >
-                    <i className="fas fa-trash" />
-                  </Btn>
-                </div>
-              ))}
-            </div>
+        {!isEdit && selectedProfile && (
+          <div
+            className="rounded-md px-3 py-2 text-[11px] mt-1"
+            style={{ background: "#dafbe1", border: "1px solid #aceebb", color: "#1a7f37" }}
+          >
+            <i className="fas fa-user-check mr-1" />
+            Assigning <strong>{role}</strong> to <strong>{selectedProfile.full_name}</strong>
           </div>
         )}
       </ModalBody>
       <ModalFoot>
         <Btn variant="outline" onClick={onClose}>
-          Close
+          Cancel
         </Btn>
-        <Btn onClick={save} disabled={saving || !userId.trim()}>
-          {saving ? "Saving…" : "Assign Role"}
+        <Btn onClick={save} disabled={saving || !selectedUserId}>
+          {saving ? "Saving…" : isEdit ? "Update Role" : "Assign Role"}
         </Btn>
       </ModalFoot>
     </Modal>
