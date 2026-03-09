@@ -300,3 +300,31 @@ export function useForms() {
     },
   });
 }
+
+export function useRequisitions(filters?: { requestorId?: string; status?: string }) {
+  return useQuery({
+    queryKey: ["requisitions", filters],
+    queryFn: async () => {
+      let q = (supabase as any).from("requisitions").select("*").order("created_at", { ascending: false });
+      if (filters?.requestorId) q = q.eq("requestor_id", filters.requestorId);
+      if (filters?.status) q = q.eq("status", filters.status);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
+export function useRequisitionLogs(requisitionId?: string) {
+  return useQuery({
+    queryKey: ["requisition_logs", requisitionId],
+    queryFn: async () => {
+      let q = (supabase as any).from("requisition_logs").select("*").order("created_at", { ascending: true });
+      if (requisitionId) q = q.eq("requisition_id", requisitionId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!requisitionId,
+  });
+}
