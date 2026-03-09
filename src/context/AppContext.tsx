@@ -1,8 +1,23 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { useAuth } from "@/context/AuthContext";
 
-export type PageId = 'dashboard' | 'students' | 'faculty' | 'parents' | 'exams' | 'results' |
-  'attendance' | 'hod' | 'hoy' | 'config' | 'assignments' | 'announcements' | 'admission' | 'users' | 'profile';
+export type PageId =
+  | "dashboard"
+  | "students"
+  | "faculty"
+  | "parents"
+  | "exams"
+  | "results"
+  | "requisitions"
+  | "attendance"
+  | "hod"
+  | "hoy"
+  | "config"
+  | "assignments"
+  | "announcements"
+  | "admission"
+  | "users"
+  | "profile";
 
 interface AppState {
   page: PageId;
@@ -19,21 +34,21 @@ export const useApp = () => useContext(AppContext);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { primaryRole, isAdmin, isHOD, isHOY } = useAuth();
-  const defaultPage: PageId = (isAdmin || isHOD || isHOY) ? 'dashboard' : 'announcements';
+  const defaultPage: PageId = isAdmin || isHOD || isHOY ? "dashboard" : "announcements";
 
   const [page, setPageState] = useState<PageId>(defaultPage);
   const [detail, setDetail] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
 
-  const refresh = useCallback(() => setTick(t => t + 1), []);
+  const refresh = useCallback(() => setTick((t) => t + 1), []);
 
   const setPage = useCallback((p: PageId) => {
     setPageState(p);
     setDetail(null);
   }, []);
 
-  const showToast = useCallback((msg: string, type = 'success') => {
+  const showToast = useCallback((msg: string, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   }, []);
@@ -47,7 +62,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 }
 
 function Toast({ msg, type }: { msg: string; type: string }) {
-  const bg = type === 'success' ? '#1a7f37' : type === 'error' ? '#cf222e' : type === 'info' ? '#0969da' : '#8250df';
-  const icon = type === 'success' ? '✓' : type === 'info' ? 'ℹ' : type === 'error' ? '✕' : '★';
-  return <div className="app-toast" style={{ background: bg }}>{icon} {msg}</div>;
+  const bg = type === "success" ? "#1a7f37" : type === "error" ? "#cf222e" : type === "info" ? "#0969da" : "#8250df";
+  const icon = type === "success" ? "✓" : type === "info" ? "ℹ" : type === "error" ? "✕" : "★";
+  return (
+    <div className="app-toast" style={{ background: bg }}>
+      {icon} {msg}
+    </div>
+  );
 }
