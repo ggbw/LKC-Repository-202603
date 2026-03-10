@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { cap } from '@/data/database';
 import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
 import { Badge, Card, InfoRow, SearchBar, BackBtn, Btn,
+
+const DEPARTMENTS = ['Administration', 'Science', 'Mathematics', 'Languages', 'Humanities', 'ICT', 'Arts', 'Physical Education', 'Finance', 'Maintenance', 'Library', 'Other'];
   Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
 
 export default function FacultyPage() {
@@ -138,6 +140,7 @@ function TeacherModal({ id, teachers, onClose }: { id: string | null; teachers: 
   const [name, setName] = useState(existing?.name || '');
   const [code, setCode] = useState(existing?.code || '');
   const [dept, setDept] = useState(existing?.department || '');
+  const deptIsCustom = dept !== '' && !['Administration', 'Science', 'Mathematics', 'Languages', 'Humanities', 'ICT', 'Arts', 'Physical Education', 'Finance', 'Maintenance', 'Library', 'Other'].includes(dept);
   const [email, setEmail] = useState(existing?.email || '');
   const [phone, setPhone] = useState(existing?.phone || '');
   const [saving, setSaving] = useState(false);
@@ -166,7 +169,27 @@ function TeacherModal({ id, teachers, onClose }: { id: string | null; teachers: 
           <Field label="Code"><FieldInput value={code} onChange={setCode} /></Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Department"><FieldInput value={dept} onChange={setDept} /></Field>
+          <Field label="Department">
+            <select
+              className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+              style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--surface))' }}
+              value={deptIsCustom ? '__other__' : dept}
+              onChange={e => setDept(e.target.value === '__other__' ? '' : e.target.value)}
+            >
+              <option value="">— Select Department —</option>
+              {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              <option value="__other__">Other / Custom…</option>
+            </select>
+            {deptIsCustom && (
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px] mt-1.5"
+                style={{ borderColor: 'hsl(var(--border))', background: 'hsl(var(--surface))' }}
+                placeholder="Enter custom department name…"
+                value={dept}
+                onChange={e => setDept(e.target.value)}
+              />
+            )}
+          </Field>
           <Field label="Email"><FieldInput value={email} onChange={setEmail} type="email" /></Field>
         </div>
         <Field label="Phone"><FieldInput value={phone} onChange={setPhone} /></Field>
