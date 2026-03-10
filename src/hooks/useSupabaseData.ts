@@ -328,3 +328,14 @@ export function useRequisitionLogs(requisitionId?: string) {
     enabled: !!requisitionId,
   });
 }
+
+export function useReqRoleMappings() {
+  return useQuery({
+    queryKey: ["req_role_mappings"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("requisition_role_mappings").select("*").order("req_role");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
