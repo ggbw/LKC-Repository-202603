@@ -1164,7 +1164,7 @@ function UserRoleModal({
   profiles,
   onClose,
 }: {
-  existing: { id: string; user_id: string; role: string; name: string } | false;
+  existing: { id: string; user_id: string; role: string; name: string };
   profiles: any[];
   onClose: () => void;
 }) {
