@@ -580,11 +580,41 @@ export type Database = {
           },
         ]
       }
+      requisition_role_mappings: {
+        Row: {
+          created_at: string | null
+          id: string
+          req_role: string
+          user_email: string | null
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          req_role: string
+          user_email?: string | null
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          req_role?: string
+          user_email?: string | null
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
       requisitions: {
         Row: {
           attachment_name: string | null
           attachment_url: string | null
           category: Database["public"]["Enums"]["req_category"]
+          category_officer_approved_at: string | null
+          category_officer_id: string | null
+          category_officer_name: string | null
           created_at: string | null
           current_stage: number
           date_required: string
@@ -597,6 +627,9 @@ export type Database = {
           executor_assigned_by: string | null
           id: string
           justification: string
+          md_approved_at: string | null
+          md_id: string | null
+          md_name: string | null
           quantity: number
           ref_number: string
           rejection_reason: string | null
@@ -612,6 +645,9 @@ export type Database = {
           attachment_name?: string | null
           attachment_url?: string | null
           category: Database["public"]["Enums"]["req_category"]
+          category_officer_approved_at?: string | null
+          category_officer_id?: string | null
+          category_officer_name?: string | null
           created_at?: string | null
           current_stage?: number
           date_required: string
@@ -624,6 +660,9 @@ export type Database = {
           executor_assigned_by?: string | null
           id?: string
           justification: string
+          md_approved_at?: string | null
+          md_id?: string | null
+          md_name?: string | null
           quantity?: number
           ref_number?: string
           rejection_reason?: string | null
@@ -639,6 +678,9 @@ export type Database = {
           attachment_name?: string | null
           attachment_url?: string | null
           category?: Database["public"]["Enums"]["req_category"]
+          category_officer_approved_at?: string | null
+          category_officer_id?: string | null
+          category_officer_name?: string | null
           created_at?: string | null
           current_stage?: number
           date_required?: string
@@ -651,6 +693,9 @@ export type Database = {
           executor_assigned_by?: string | null
           id?: string
           justification?: string
+          md_approved_at?: string | null
+          md_id?: string | null
+          md_name?: string | null
           quantity?: number
           ref_number?: string
           rejection_reason?: string | null

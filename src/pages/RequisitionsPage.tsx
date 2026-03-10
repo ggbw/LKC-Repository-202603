@@ -744,7 +744,7 @@ function RequisitionDetail({ req, canAct, userId, isMD, actorName, actorId, onCl
 
   return (
     <Modal onClose={onClose} size="lg">
-      <ModalHead title={<span className="font-mono">{req.ref_number}</span>} onClose={onClose} />
+      <ModalHead title={`REQ: ${req.ref_number}`} onClose={onClose} />
       <ModalBody>
         {/* Stepper */}
         <div
