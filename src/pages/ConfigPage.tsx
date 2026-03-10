@@ -47,7 +47,7 @@ export default function ConfigPage() {
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: studentSubjects = [] } = useStudentSubjects();
   const { data: classTeachers = [] } = useClassTeachers();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isClassTeacher, myClassAssignments } = useAuth();
   const { showToast } = useApp();
   const invalidate = useInvalidate();
   const [hodModal, setHodModal] = useState(false);
@@ -123,6 +123,8 @@ export default function ConfigPage() {
           subjects={subjects}
           students={students}
           isAdmin={isAdmin}
+          isClassTeacher={isClassTeacher}
+          myClassAssignments={myClassAssignments}
           showToast={showToast}
           invalidate={invalidate}
           onAdd={() => setSsModal(true)}
@@ -1168,10 +1170,10 @@ function UserRoleModal({
 }) {
   const { showToast } = useApp();
   const invalidate = useInvalidate();
-  const isEdit = existing !== false && existing.id !== "";
+  const isEdit = existing.id !== "";
 
-  const [selectedUserId, setSelectedUserId] = useState(isEdit && existing ? existing.user_id : "");
-  const [role, setRole] = useState<AppRole>(isEdit && existing ? (existing.role as AppRole) : "student");
+  const [selectedUserId, setSelectedUserId] = useState(isEdit ? existing.user_id : "");
+  const [role, setRole] = useState<AppRole>(isEdit ? (existing.role as AppRole) : "student");
   const [saving, setSaving] = useState(false);
 
   const selectedProfile = profiles.find((p: any) => p.user_id === selectedUserId);
@@ -1181,7 +1183,7 @@ function UserRoleModal({
     setSaving(true);
     if (isEdit) {
       // Update: delete old + insert new (role is part of unique key so can't update in place)
-      await supabase.from("user_roles").delete().eq("id", existing ? existing.id : "");
+      await supabase.from("user_roles").delete().eq("id", existing.id);
       const { error } = (await supabase
         .from("user_roles")
         .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
@@ -1209,7 +1211,7 @@ function UserRoleModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={isEdit && existing ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
+      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
         {!isEdit && (
           <Field label="User" required>
@@ -1235,9 +1237,9 @@ function UserRoleModal({
             className="rounded-md px-3 py-2.5 mb-3 text-[12px]"
             style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
           >
-            <div className="font-semibold">{existing ? existing.name : ""}</div>
+            <div className="font-semibold">{existing.name}</div>
             <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text2))" }}>
-              Current role: <span className="font-semibold">{existing ? existing.role : ""}</span>
+              Current role: <span className="font-semibold">{existing.role}</span>
             </div>
           </div>
         )}
@@ -1348,92 +1350,149 @@ function SubjectTeacherTab({ subjectTeachers, subjects, teachers, isAdmin, showT
   );
 }
 
-function SubjectStudentTab({ studentSubjects, subjects, students, isAdmin, showToast, invalidate, onAdd }: any) {
+function SubjectStudentTab({
+  studentSubjects,
+  subjects,
+  students,
+  isAdmin,
+  isClassTeacher,
+  myClassAssignments,
+  showToast,
+  invalidate,
+  onAdd,
+}: any) {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterForm, setFilterForm] = useState("");
-  const filtered = studentSubjects.filter(
-    (ss: any) =>
-      (!filterSubject || ss.subject_id === filterSubject) && (!filterForm || ss.students?.form === filterForm),
-  );
+  const [ssModal, setSsModal] = useState(false);
+  const canManage = isAdmin || isClassTeacher;
+
+  // Class teachers only see their own students
+  const myStudentIds = useMemo(() => {
+    if (isAdmin || !myClassAssignments?.length) return null; // null = no restriction
+    return new Set(
+      students
+        .filter((s: any) => myClassAssignments.some((ca: any) => ca.form === s.form && ca.class_name === s.class_name))
+        .map((s: any) => s.id),
+    );
+  }, [isAdmin, myClassAssignments, students]);
+
+  const filtered = studentSubjects.filter((ss: any) => {
+    if (myStudentIds && !myStudentIds.has(ss.student_id)) return false;
+    return (!filterSubject || ss.subject_id === filterSubject) && (!filterForm || ss.students?.form === filterForm);
+  });
+
+  const classLabel = myClassAssignments?.length
+    ? myClassAssignments.map((ca: any) => `${ca.form} ${ca.class_name}`).join(", ")
+    : "";
 
   return (
-    <Card
-      title="Subject → Student Mappings"
-      titleRight={
-        isAdmin && (
-          <Btn size="sm" onClick={onAdd}>
-            <i className="fas fa-plus mr-1" />
-            Map Subject to Students
-          </Btn>
-        )
-      }
-    >
-      <div className="flex gap-2 mb-3">
-        <FilterSelect
-          value={filterSubject}
-          onChange={setFilterSubject}
-          allLabel="All Subjects"
-          options={subjects.map((s: any) => ({ value: s.id, label: s.name }))}
-        />
-        <FilterSelect
-          value={filterForm}
-          onChange={setFilterForm}
-          allLabel="All Forms"
-          options={FORMS.map((f) => ({ value: f, label: f }))}
-        />
-      </div>
-      {filtered.length === 0 ? (
-        <div className="text-xs py-4 text-center" style={{ color: "hsl(var(--text3))" }}>
-          No mappings
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[12.5px]">
-            <thead>
-              <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
-                {["Subject", "Student", "Form", "Teacher", "Actions"].map((h) => (
-                  <th
-                    key={h}
-                    className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase"
-                    style={{ color: "hsl(var(--text2))" }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.slice(0, 100).map((ss: any) => (
-                <tr key={ss.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
-                  <td className="py-2.5 px-3.5 font-semibold">{ss.subjects?.name}</td>
-                  <td className="py-2.5 px-3.5">{ss.students?.full_name}</td>
-                  <td className="py-2.5 px-3.5 text-[11px]">{ss.students?.form}</td>
-                  <td className="py-2.5 px-3.5 text-[11px]">{ss.teachers?.name || "—"}</td>
-                  <td className="py-2.5 px-3.5">
-                    {isAdmin && (
-                      <Btn
-                        variant="danger"
-                        size="sm"
-                        onClick={async () => {
-                          await supabase.from("student_subjects").delete().eq("id", ss.id);
-                          invalidate(["student_subjects"]);
-                          showToast("Removed");
-                        }}
-                      >
-                        <i className="fas fa-trash" />
-                      </Btn>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="text-[11px] mt-2" style={{ color: "hsl(var(--text2))" }}>
-            {filtered.length} mappings
+    <>
+      <Card
+        title="Subject → Student Mappings"
+        titleRight={
+          canManage && (
+            <Btn size="sm" onClick={() => (isAdmin ? onAdd() : setSsModal(true))}>
+              <i className="fas fa-plus mr-1" />
+              Map Subject to Students
+            </Btn>
+          )
+        }
+      >
+        {isClassTeacher && !isAdmin && classLabel && (
+          <div
+            className="rounded-md px-3 py-2 mb-3 text-[11.5px]"
+            style={{ background: "#ddf4ff", border: "1px solid #b6d5f7", color: "#0969da" }}
+          >
+            <i className="fas fa-chalkboard-teacher mr-1.5" />
+            Showing mappings for your class{myClassAssignments.length > 1 ? "es" : ""}: <strong>{classLabel}</strong>
           </div>
+        )}
+        <div className="flex gap-2 mb-3">
+          <FilterSelect
+            value={filterSubject}
+            onChange={setFilterSubject}
+            allLabel="All Subjects"
+            options={subjects.map((s: any) => ({ value: s.id, label: s.name }))}
+          />
+          {isAdmin && (
+            <FilterSelect
+              value={filterForm}
+              onChange={setFilterForm}
+              allLabel="All Forms"
+              options={FORMS.map((f) => ({ value: f, label: f }))}
+            />
+          )}
         </div>
+        {filtered.length === 0 ? (
+          <div className="text-xs py-4 text-center" style={{ color: "hsl(var(--text3))" }}>
+            No mappings
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[12.5px]">
+              <thead>
+                <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+                  {["Subject", "Student", "Form / Class", "Teacher", ...(canManage ? ["Actions"] : [])].map((h) => (
+                    <th
+                      key={h}
+                      className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase"
+                      style={{ color: "hsl(var(--text2))" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.slice(0, 200).map((ss: any) => (
+                  <tr key={ss.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                    <td className="py-2.5 px-3.5 font-semibold">{ss.subjects?.name}</td>
+                    <td className="py-2.5 px-3.5">{ss.students?.full_name}</td>
+                    <td className="py-2.5 px-3.5 text-[11px]">
+                      {ss.students?.form}
+                      {ss.students?.class_name ? ` · ${ss.students.class_name}` : ""}
+                    </td>
+                    <td className="py-2.5 px-3.5 text-[11px]">{ss.teachers?.name || "—"}</td>
+                    {canManage && (
+                      <td className="py-2.5 px-3.5">
+                        <Btn
+                          variant="danger"
+                          size="sm"
+                          onClick={async () => {
+                            await supabase.from("student_subjects").delete().eq("id", ss.id);
+                            invalidate(["student_subjects"]);
+                            showToast("Removed");
+                          }}
+                        >
+                          <i className="fas fa-trash" />
+                        </Btn>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="text-[11px] mt-2" style={{ color: "hsl(var(--text2))" }}>
+              {filtered.length} mapping(s)
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {ssModal && (
+        <SubjectStudentModal
+          subjects={subjects}
+          students={students.filter((s: any) => (myStudentIds ? myStudentIds.has(s.id) : true))}
+          existingMappings={studentSubjects}
+          myClassAssignments={myClassAssignments}
+          isClassTeacher={isClassTeacher && !isAdmin}
+          onClose={() => {
+            setSsModal(false);
+            invalidate(["student_subjects"]);
+          }}
+        />
       )}
-    </Card>
+    </>
   );
 }
 
@@ -1667,10 +1726,16 @@ function SubjectTeacherModal({
 function SubjectStudentModal({
   subjects,
   students,
+  existingMappings,
+  myClassAssignments,
+  isClassTeacher,
   onClose,
 }: {
   subjects: any[];
   students: any[];
+  existingMappings?: any[];
+  myClassAssignments?: any[];
+  isClassTeacher?: boolean;
   onClose: () => void;
 }) {
   const { showToast } = useApp();
@@ -1678,11 +1743,18 @@ function SubjectStudentModal({
   const { data: existingStudentSubjects = [] } = useStudentSubjects();
   const [subjectId, setSubjectId] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
-  const [filterForm, setFilterForm] = useState("Form 1");
-  const [filterClass, setFilterClass] = useState("");
+  // For class teachers: default to their first class's form; for admins: Form 1
+  const defaultForm = myClassAssignments?.length ? myClassAssignments[0].form : "Form 1";
+  const [filterForm, setFilterForm] = useState(defaultForm);
+  const [filterClass, setFilterClass] = useState(
+    myClassAssignments?.length === 1 ? myClassAssignments[0].class_name : "",
+  );
   const [searchStr, setSearchStr] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // For class teachers, only show forms/classes they own
+  const allowedClasses = myClassAssignments || [];
 
   // Teachers who teach the selected subject
   const matchedTeachers = useMemo(() => {
@@ -1701,17 +1773,28 @@ function SubjectStudentModal({
     );
   }, [subjectId, existingStudentSubjects]);
 
-  // Available classes for current form
+  // Available classes for current form — restricted to teacher's own classes if class teacher
   const availableClasses = useMemo(() => {
-    return [
+    const all = [
       ...new Set(
         students
           .filter((s: any) => s.form === filterForm && s.state === "active")
           .map((s: any) => s.class_name)
           .filter(Boolean),
       ),
-    ].sort();
-  }, [students, filterForm]);
+    ].sort() as string[];
+    if (isClassTeacher && allowedClasses.length) {
+      const allowed = allowedClasses.filter((ca: any) => ca.form === filterForm).map((ca: any) => ca.class_name);
+      return all.filter((c) => allowed.includes(c));
+    }
+    return all;
+  }, [students, filterForm, isClassTeacher, allowedClasses]);
+
+  // Available forms — restricted to teacher's own forms if class teacher
+  const availableForms = useMemo(() => {
+    if (isClassTeacher && allowedClasses.length) return [...new Set(allowedClasses.map((ca: any) => ca.form))];
+    return FORMS;
+  }, [isClassTeacher, allowedClasses]);
 
   const formStudents = useMemo(() => {
     return students.filter(
@@ -1826,6 +1909,16 @@ function SubjectStudentModal({
               <i className="fas fa-users mr-1.5" />
               Step 3 — Select Students
             </div>
+            {isClassTeacher && allowedClasses.length > 0 && (
+              <div
+                className="rounded-md px-3 py-2 mb-3 text-[11.5px]"
+                style={{ background: "#ddf4ff", border: "1px solid #b6d5f7", color: "#0969da" }}
+              >
+                <i className="fas fa-chalkboard-teacher mr-1.5" />
+                Mapping subjects for your class{allowedClasses.length > 1 ? "es" : ""}:{" "}
+                <strong>{allowedClasses.map((ca: any) => `${ca.form} ${ca.class_name}`).join(", ")}</strong>
+              </div>
+            )}
             <div className="flex gap-2 mb-3">
               <FieldSelect
                 value={filterForm}
@@ -1834,7 +1927,7 @@ function SubjectStudentModal({
                   setFilterClass("");
                   setSelectedIds([]);
                 }}
-                options={FORMS.map((f) => ({ value: f, label: f }))}
+                options={availableForms.map((f: string) => ({ value: f, label: f }))}
               />
               <FieldSelect
                 value={filterClass}
