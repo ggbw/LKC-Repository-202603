@@ -14,6 +14,7 @@ import {
   useUserRoles,
   useClasses,
   useProfiles,
+  useReqRoleMappings,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
@@ -54,13 +55,16 @@ export default function ConfigPage() {
   const [stModal, setStModal] = useState(false);
   const [ssModal, setSsModal] = useState(false);
   const [ctModal, setCtModal] = useState(false);
-  const [tab, setTab] = useState<"general" | "subject-teacher" | "subject-student" | "class-teacher">("general");
+  const [tab, setTab] = useState<"general" | "subject-teacher" | "subject-student" | "class-teacher" | "requisitions">(
+    "general",
+  );
 
   const tabs = [
     ["general", "General"],
     ["subject-teacher", `Subject → Teacher (${subjectTeachers.length})`],
     ["subject-student", `Subject → Student (${studentSubjects.length})`],
     ["class-teacher", `Class Teachers (${classTeachers.length})`],
+    ["requisitions", "Requisition Roles"],
   ];
 
   return (
@@ -135,6 +139,10 @@ export default function ConfigPage() {
           invalidate={invalidate}
           onAdd={() => setCtModal(true)}
         />
+      )}
+
+      {tab === "requisitions" && (
+        <RequisitionRolesTab isAdmin={isAdmin} showToast={showToast} invalidate={invalidate} />
       )}
 
       {hodModal && (
@@ -1160,10 +1168,10 @@ function UserRoleModal({
 }) {
   const { showToast } = useApp();
   const invalidate = useInvalidate();
-  const isEdit = existing !== false && existing.id !== "";
+  const isEdit = existing.id !== "";
 
-  const [selectedUserId, setSelectedUserId] = useState(isEdit && existing ? existing.user_id : "");
-  const [role, setRole] = useState<AppRole>(isEdit && existing ? (existing.role as AppRole) : "student");
+  const [selectedUserId, setSelectedUserId] = useState(isEdit ? existing.user_id : "");
+  const [role, setRole] = useState<AppRole>(isEdit ? (existing.role as AppRole) : "student");
   const [saving, setSaving] = useState(false);
 
   const selectedProfile = profiles.find((p: any) => p.user_id === selectedUserId);
@@ -1173,7 +1181,7 @@ function UserRoleModal({
     setSaving(true);
     if (isEdit) {
       // Update: delete old + insert new (role is part of unique key so can't update in place)
-      if (existing) if (existing) await supabase.from("user_roles").delete().eq("id", existing.id);
+      await supabase.from("user_roles").delete().eq("id", existing.id);
       const { error } = (await supabase
         .from("user_roles")
         .upsert({ user_id: selectedUserId, role }, { onConflict: "user_id,role" })) as any;
@@ -1201,7 +1209,7 @@ function UserRoleModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={isEdit && existing ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
+      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
         {!isEdit && (
           <Field label="User" required>
@@ -1227,9 +1235,9 @@ function UserRoleModal({
             className="rounded-md px-3 py-2.5 mb-3 text-[12px]"
             style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
           >
-            <div className="font-semibold">{existing && existing.name}</div>
+            <div className="font-semibold">{existing.name}</div>
             <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text2))" }}>
-              Current role: <span className="font-semibold">{existing && existing.role}</span>
+              Current role: <span className="font-semibold">{existing.role}</span>
             </div>
           </div>
         )}
@@ -2002,6 +2010,242 @@ function ClassTeacherModal({ teachers, students, onClose }: { teachers: any[]; s
           Cancel
         </Btn>
         <Btn onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Assign"}
+        </Btn>
+      </ModalFoot>
+    </Modal>
+  );
+}
+
+// ─── Requisition Roles Tab ────────────────────────────────────────────────────
+
+const REQ_ROLES = [
+  {
+    role: "Stationery Officer",
+    ico: "fas fa-box",
+    color: "#0969da",
+    bg: "#ddf4ff",
+    desc: "Handles stationery requisitions",
+  },
+  {
+    role: "Maintenance Officer",
+    ico: "fas fa-tools",
+    color: "#9a6700",
+    bg: "#fff8c5",
+    desc: "Handles maintenance requests",
+  },
+  { role: "ICT Head", ico: "fas fa-laptop", color: "#6e40c9", bg: "#f1f0ff", desc: "Handles ICT equipment requests" },
+  {
+    role: "CFO",
+    ico: "fas fa-money-bill-wave",
+    color: "#cf222e",
+    bg: "#ffebe9",
+    desc: "Handles vehicle, transport & high-value items",
+  },
+  {
+    role: "Resource Centre Admin",
+    ico: "fas fa-book-open",
+    color: "#1a7f37",
+    bg: "#dafbe1",
+    desc: "Handles resource centre requests",
+  },
+  { role: "MD", ico: "fas fa-crown", color: "#856404", bg: "#fff3cd", desc: "Final approver — all requisitions" },
+];
+
+function RequisitionRolesTab({ isAdmin, showToast, invalidate }: any) {
+  const { data: mappings = [] } = useReqRoleMappings();
+  const { data: profiles = [] } = useProfiles();
+  const [addModal, setAddModal] = useState<string | null>(null); // holds the req_role string
+  const [saving, setSaving] = useState(false);
+
+  const mappingsByRole = REQ_ROLES.reduce(
+    (acc, r) => {
+      acc[r.role] = mappings.filter((m: any) => m.req_role === r.role);
+      return acc;
+    },
+    {} as Record<string, any[]>,
+  );
+
+  const removeMapping = async (id: string, roleName: string, userName: string) => {
+    if (!confirm(`Remove ${userName} from ${roleName}?`)) return;
+    const { error } = await (supabase as any).from("requisition_role_mappings").delete().eq("id", id);
+    if (error) {
+      showToast(error.message, "error");
+      return;
+    }
+    showToast("Mapping removed");
+    invalidate(["req_role_mappings"]);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="rounded-md px-4 py-3 text-[12px]"
+        style={{ background: "#ddf4ff", border: "1px solid #b6d5f7", color: "#0969da" }}
+      >
+        <i className="fas fa-info-circle mr-1.5" />
+        Map users to procurement roles. When a requisition is submitted, the officer for that category is automatically
+        notified and becomes the first approver. All approved requisitions then go to the <strong>MD</strong> for final
+        sign-off.
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {REQ_ROLES.map(({ role, ico, color, bg, desc }) => {
+          const roleMappings = mappingsByRole[role] || [];
+          return (
+            <Card
+              key={role}
+              title={
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-7 h-7 rounded-[6px] flex items-center justify-center flex-shrink-0"
+                    style={{ background: bg }}
+                  >
+                    <i className={ico} style={{ color, fontSize: "13px" }} />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-semibold">{role}</div>
+                    <div className="text-[10px] font-normal" style={{ color: "hsl(var(--text3))" }}>
+                      {desc}
+                    </div>
+                  </div>
+                </div>
+              }
+              titleRight={
+                isAdmin && (
+                  <Btn size="sm" variant="outline" onClick={() => setAddModal(role)}>
+                    <i className="fas fa-plus mr-1" />
+                    Assign
+                  </Btn>
+                )
+              }
+            >
+              {roleMappings.length === 0 ? (
+                <div className="text-[11px] py-2" style={{ color: "hsl(var(--text3))" }}>
+                  <i className="fas fa-user-slash mr-1" />
+                  No user assigned
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {roleMappings.map((m: any) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center justify-between rounded-md px-2.5 py-2"
+                      style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
+                    >
+                      <div>
+                        <div className="text-[12.5px] font-semibold">{m.user_name}</div>
+                        {m.user_email && (
+                          <div className="text-[10px]" style={{ color: "hsl(var(--text3))" }}>
+                            {m.user_email}
+                          </div>
+                        )}
+                      </div>
+                      {isAdmin && (
+                        <Btn variant="danger" size="sm" onClick={() => removeMapping(m.id, role, m.user_name)}>
+                          <i className="fas fa-trash" />
+                        </Btn>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      {addModal && (
+        <ReqRoleAssignModal
+          reqRole={addModal}
+          profiles={profiles}
+          existingUserIds={mappingsByRole[addModal]?.map((m: any) => m.user_id) || []}
+          onClose={() => {
+            setAddModal(null);
+            invalidate(["req_role_mappings"]);
+          }}
+          showToast={showToast}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReqRoleAssignModal({ reqRole, profiles, existingUserIds, onClose, showToast }: any) {
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const roleInfo = REQ_ROLES.find((r) => r.role === reqRole);
+  const availableProfiles = profiles.filter((p: any) => !existingUserIds.includes(p.user_id));
+
+  const save = async () => {
+    if (!selectedUserId) return;
+    setSaving(true);
+    const profile = profiles.find((p: any) => p.user_id === selectedUserId);
+    const { error } = await (supabase as any).from("requisition_role_mappings").insert({
+      req_role: reqRole,
+      user_id: selectedUserId,
+      user_name: profile?.full_name || "Unknown",
+      user_email: profile?.email || null,
+    });
+    if (error) {
+      showToast(error.message, "error");
+      setSaving(false);
+      return;
+    }
+    showToast(`${profile?.full_name} assigned as ${reqRole}`);
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHead title={`Assign ${reqRole}`} onClose={onClose} />
+      <ModalBody>
+        {roleInfo && (
+          <div
+            className="flex items-center gap-3 rounded-md p-3 mb-3"
+            style={{ background: roleInfo.bg, border: `1px solid ${roleInfo.color}22` }}
+          >
+            <div className="w-8 h-8 rounded-[7px] flex items-center justify-center" style={{ background: "white" }}>
+              <i className={roleInfo.ico} style={{ color: roleInfo.color }} />
+            </div>
+            <div>
+              <div className="font-semibold text-[12.5px]" style={{ color: roleInfo.color }}>
+                {roleInfo.role}
+              </div>
+              <div className="text-[11px]" style={{ color: roleInfo.color }}>
+                {roleInfo.desc}
+              </div>
+            </div>
+          </div>
+        )}
+        <Field label="Select User" required>
+          <select
+            className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+            style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+          >
+            <option value="">— Select user —</option>
+            {availableProfiles.map((p: any) => (
+              <option key={p.user_id} value={p.user_id}>
+                {p.full_name}
+                {p.email ? ` (${p.email})` : ""}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {availableProfiles.length === 0 && (
+          <div className="text-[11px]" style={{ color: "hsl(var(--text3))" }}>
+            All users are already assigned to this role.
+          </div>
+        )}
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn onClick={save} disabled={saving || !selectedUserId}>
           {saving ? "Saving…" : "Assign"}
         </Btn>
       </ModalFoot>
