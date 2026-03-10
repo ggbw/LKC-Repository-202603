@@ -56,16 +56,18 @@ export default function ConfigPage() {
   const [ssModal, setSsModal] = useState(false);
   const [ctModal, setCtModal] = useState(false);
   const [tab, setTab] = useState<"general" | "subject-teacher" | "subject-student" | "class-teacher" | "requisitions">(
-    "general",
+    isAdmin ? "general" : "subject-student",
   );
 
-  const tabs = [
+  const allTabs: [string, string][] = [
     ["general", "General"],
     ["subject-teacher", `Subject → Teacher (${subjectTeachers.length})`],
     ["subject-student", `Subject → Student (${studentSubjects.length})`],
     ["class-teacher", `Class Teachers (${classTeachers.length})`],
     ["requisitions", "Requisition Roles"],
   ];
+  // Class teachers (non-admin) only see the Subject → Student tab
+  const tabs = isAdmin ? allTabs : allTabs.filter(([id]) => id === "subject-student");
 
   return (
     <div className="page-animate">
