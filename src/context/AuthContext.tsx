@@ -28,6 +28,7 @@ interface AuthState {
   isHOD: boolean;
   isHOY: boolean;
   isClassTeacher: boolean;
+  myClassAssignments: { form: string; class_name: string }[];
   primaryRole: AppRole;
 }
 
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [isClassTeacher, setIsClassTeacher] = useState(false);
+  const [myClassAssignments, setMyClassAssignments] = useState<{ form: string; class_name: string }[]>([]);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data: prof } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
@@ -50,17 +52,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: rolesData } = await supabase.rpc("get_user_roles", { _user_id: userId });
     setRoles((rolesData as AppRole[]) || []);
 
-    // Check if this user is a class teacher
+    // Check if this user is a class teacher and fetch their class assignments
     const { data: teacherData } = await supabase.from("teachers").select("id").eq("user_id", userId).single();
     if (teacherData) {
-      const { data: ctData } = await supabase
+      const { data: ctData } = await (supabase as any)
         .from("class_teachers")
-        .select("id")
-        .eq("teacher_id", (teacherData as any).id)
-        .limit(1);
+        .select("form, class_name")
+        .eq("teacher_id", (teacherData as any).id);
       setIsClassTeacher((ctData || []).length > 0);
+      setMyClassAssignments((ctData || []).map((c: any) => ({ form: c.form, class_name: c.class_name })));
     } else {
       setIsClassTeacher(false);
+      setMyClassAssignments([]);
     }
   }, []);
 
@@ -144,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isHOD,
         isHOY,
         isClassTeacher,
+        myClassAssignments,
         primaryRole,
       }}
     >
