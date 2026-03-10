@@ -1209,7 +1209,7 @@ function UserRoleModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={isEdit ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
+      <ModalHead title={isEdit && existing ? `Edit Role — ${existing.name}` : "Assign User Role"} onClose={onClose} />
       <ModalBody>
         {!isEdit && (
           <Field label="User" required>
