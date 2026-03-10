@@ -43,6 +43,7 @@ function navItems(roles: AppRole[]): NavItem[] {
     items.push({ id: "attendance", ico: "fas fa-calendar-check", label: "Attendance" });
     items.push({ id: "results", ico: "fas fa-chart-bar", label: "Exam Results" });
     items.push({ id: "requisitions", ico: "fas fa-file-invoice", label: "Requisitions" });
+    items.push({ id: "config", ico: "fas fa-cogs", label: "Configuration" });
   }
 
   if (isHOD) {
