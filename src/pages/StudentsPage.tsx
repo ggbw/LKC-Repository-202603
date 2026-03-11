@@ -1,27 +1,51 @@
-import React, { useState, useMemo } from 'react';
-import { useApp } from '@/context/AppContext';
-import { useAuth } from '@/context/AuthContext';
-import { useStudents, useTeachers, useSubjects, useSubjectTeachers, useStudentSubjects, useClassTeachers, useInvalidate } from '@/hooks/useSupabaseData';
-import { supabase } from '@/integrations/supabase/client';
-import { FORMS, cap, formatDate } from '@/data/database';
-import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
-import { Badge, Card, InfoRow, SearchBar, FilterSelect, Btn, BackBtn,
-  Modal, ModalHead, ModalBody, ModalFoot, FormSection, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
+import React, { useState, useMemo } from "react";
+import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
+import {
+  useStudents,
+  useTeachers,
+  useSubjects,
+  useSubjectTeachers,
+  useStudentSubjects,
+  useClassTeachers,
+  useInvalidate,
+} from "@/hooks/useSupabaseData";
+import { supabase } from "@/integrations/supabase/client";
+import { FORMS, cap, formatDate } from "@/data/database";
+import { downloadExcel, parseExcel, triggerFileUpload } from "@/lib/excel";
+import {
+  Badge,
+  Card,
+  InfoRow,
+  SearchBar,
+  FilterSelect,
+  Btn,
+  BackBtn,
+  Modal,
+  ModalHead,
+  ModalBody,
+  ModalFoot,
+  FormSection,
+  Field,
+  FieldInput,
+  FieldSelect,
+} from "@/components/SharedUI";
 
 export default function StudentsPage() {
   const { detail, setDetail, showToast } = useApp();
-  const { isAdmin, isTeacher, user } = useAuth();
+  const { isAdmin, isTeacher, user, isClassTeacher, myClassAssignments: ctAssignments } = useAuth();
   const { data: students = [], isLoading } = useStudents();
   const { data: teachers = [] } = useTeachers();
   const { data: subjects = [] } = useSubjects();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: studentSubjects = [] } = useStudentSubjects();
   const { data: classTeachers = [] } = useClassTeachers();
-  const [search, setSearch] = useState('');
-  const [filterForm, setFilterForm] = useState('');
-  const [filterClass, setFilterClass] = useState('');
-  const [filterState, setFilterState] = useState('');
-  const [modal, setModal] = useState<string | 'new' | null>(null);
+  const [search, setSearch] = useState("");
+  const [filterForm, setFilterForm] = useState("");
+  const [filterClass, setFilterClass] = useState("");
+  const [filterState, setFilterState] = useState("");
+  const [modal, setModal] = useState<string | "new" | null>(null);
+  const [ctModal, setCtModal] = useState<{ form: string; class_name: string } | null>(null);
   const invalidate = useInvalidate();
 
   const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
@@ -42,14 +66,14 @@ export default function StudentsPage() {
     if (isAdmin) return students;
     if (isTeacher && myTeacher) {
       const subjectStudentIds = new Set(
-        studentSubjects
-          .filter((ss: any) => mySubjectIds.includes(ss.subject_id))
-          .map((ss: any) => ss.student_id)
+        studentSubjects.filter((ss: any) => mySubjectIds.includes(ss.subject_id)).map((ss: any) => ss.student_id),
       );
       const classStudentIds = new Set(
         students
-          .filter((s: any) => myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name))
-          .map((s: any) => s.id)
+          .filter((s: any) =>
+            myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name),
+          )
+          .map((s: any) => s.id),
       );
       return students.filter((s: any) => subjectStudentIds.has(s.id) || classStudentIds.has(s.id));
     }
@@ -78,27 +102,40 @@ export default function StudentsPage() {
     return new Set(
       students
         .filter((s: any) => myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name))
-        .map((s: any) => s.id)
+        .map((s: any) => s.id),
     );
   }, [isTeacher, myTeacher, students, myClassAssignments]);
 
   if (detail) return <StudentDetail id={detail} onBack={() => setDetail(null)} />;
 
-  const rows = visibleStudents.filter((s: any) =>
-    (!search || s.full_name.toLowerCase().includes(search.toLowerCase()) || (s.enrollment_number || '').toLowerCase().includes(search.toLowerCase())) &&
-    (!filterForm || s.form === filterForm) &&
-    (!filterClass || s.class_name === filterClass) &&
-    (!filterState || s.state === filterState)
+  const rows = visibleStudents.filter(
+    (s: any) =>
+      (!search ||
+        s.full_name.toLowerCase().includes(search.toLowerCase()) ||
+        (s.enrollment_number || "").toLowerCase().includes(search.toLowerCase())) &&
+      (!filterForm || s.form === filterForm) &&
+      (!filterClass || s.class_name === filterClass) &&
+      (!filterState || s.state === filterState),
   );
 
   const handleExport = () => {
-    downloadExcel(rows.map((s: any) => ({
-      'Enrollment': s.enrollment_number || '', 'Full Name': s.full_name, 'Form': s.form,
-      'Class': s.class_name || '', 'Gender': cap(s.gender || ''), 'Status': cap(s.state || 'active'),
-      'Date of Birth': s.date_of_birth || '', 'Nationality': s.nationality || '',
-      'Email': s.email || '', 'Admission Date': s.admission_date || '',
-    })), 'students_export', 'Students');
-    showToast('Students exported');
+    downloadExcel(
+      rows.map((s: any) => ({
+        Enrollment: s.enrollment_number || "",
+        "Full Name": s.full_name,
+        Form: s.form,
+        Class: s.class_name || "",
+        Gender: cap(s.gender || ""),
+        Status: cap(s.state || "active"),
+        "Date of Birth": s.date_of_birth || "",
+        Nationality: s.nationality || "",
+        Email: s.email || "",
+        "Admission Date": s.admission_date || "",
+      })),
+      "students_export",
+      "Students",
+    );
+    showToast("Students exported");
   };
 
   const handleImport = async () => {
@@ -108,100 +145,261 @@ export default function StudentsPage() {
       const data = await parseExcel(file);
       let count = 0;
       for (const row of data) {
-        const name = row['Full Name'] || row['full_name'] || row['Name'] || row['name'];
-        const form = row['Form'] || row['form'] || 'Form 1';
+        const name = row["Full Name"] || row["full_name"] || row["Name"] || row["name"];
+        const form = row["Form"] || row["form"] || "Form 1";
         if (!name) continue;
-        const { error } = await supabase.from('students').insert({
-          full_name: name, form,
-          gender: row['Gender'] || row['gender'] || null,
-          enrollment_number: row['Enrollment'] || row['enrollment_number'] || null,
-          email: row['Email'] || row['email'] || null,
-          nationality: row['Nationality'] || row['nationality'] || null,
-          date_of_birth: row['Date of Birth'] || row['date_of_birth'] || null,
-          state: 'active',
+        const { error } = await supabase.from("students").insert({
+          full_name: name,
+          form,
+          gender: row["Gender"] || row["gender"] || null,
+          enrollment_number: row["Enrollment"] || row["enrollment_number"] || null,
+          email: row["Email"] || row["email"] || null,
+          nationality: row["Nationality"] || row["nationality"] || null,
+          date_of_birth: row["Date of Birth"] || row["date_of_birth"] || null,
+          state: "active",
         });
         if (!error) count++;
       }
       showToast(`Imported ${count} students`);
-      invalidate(['students']);
-    } catch (e: any) { showToast(e.message, 'error'); }
+      invalidate(["students"]);
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
   };
 
-  if (isLoading) return <div className="page-animate"><div className="text-sm" style={{ color: 'hsl(var(--text2))' }}>Loading students...</div></div>;
+  if (isLoading)
+    return (
+      <div className="page-animate">
+        <div className="text-sm" style={{ color: "hsl(var(--text2))" }}>
+          Loading students...
+        </div>
+      </div>
+    );
 
   return (
     <div className="page-animate">
       <div className="flex justify-between items-center mb-4">
-        <div><div className="text-lg font-bold"><i className="fas fa-graduation-cap mr-2" />Students</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{visibleStudents.length} total</div></div>
+        <div>
+          <div className="text-lg font-bold">
+            <i className="fas fa-graduation-cap mr-2" />
+            Students
+          </div>
+          <div className="text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+            {visibleStudents.length} total
+          </div>
+        </div>
         <div className="flex gap-2">
-          <Btn variant="outline" onClick={handleExport}><i className="fas fa-download mr-1" />Export</Btn>
-          {isAdmin && <Btn variant="outline" onClick={handleImport}><i className="fas fa-upload mr-1" />Import</Btn>}
-          {isAdmin && <Btn onClick={() => setModal('new')}><i className="fas fa-plus mr-1" />New Student</Btn>}
+          <Btn variant="outline" onClick={handleExport}>
+            <i className="fas fa-download mr-1" />
+            Export
+          </Btn>
+          {isAdmin && (
+            <Btn variant="outline" onClick={handleImport}>
+              <i className="fas fa-upload mr-1" />
+              Import
+            </Btn>
+          )}
+          {isAdmin && (
+            <Btn onClick={() => setModal("new")}>
+              <i className="fas fa-plus mr-1" />
+              New Student
+            </Btn>
+          )}
+          {isClassTeacher && !isAdmin && ctAssignments.length > 0 && (
+            <Btn onClick={() => setCtModal(ctAssignments[0])}>
+              <i className="fas fa-plus mr-1" />
+              Add Student
+            </Btn>
+          )}
         </div>
       </div>
       <Card>
         <SearchBar value={search} onChange={setSearch} placeholder="🔍  Search name or enrollment...">
-          <FilterSelect value={filterForm} onChange={setFilterForm} allLabel="All Forms" options={FORMS.map(f => ({ value: f, label: f }))} />
-          <FilterSelect value={filterClass} onChange={setFilterClass} allLabel="All Classes" options={[...new Set(visibleStudents.map((s: any) => s.class_name).filter(Boolean))].sort().map(c => ({ value: c, label: c }))} />
-          <FilterSelect value={filterState} onChange={setFilterState} allLabel="All Status" options={['active','suspended','graduated','transferred','inactive'].map(s => ({ value: s, label: cap(s) }))} />
+          <FilterSelect
+            value={filterForm}
+            onChange={setFilterForm}
+            allLabel="All Forms"
+            options={FORMS.map((f) => ({ value: f, label: f }))}
+          />
+          <FilterSelect
+            value={filterClass}
+            onChange={setFilterClass}
+            allLabel="All Classes"
+            options={[...new Set(visibleStudents.map((s: any) => s.class_name).filter(Boolean))]
+              .sort()
+              .map((c) => ({ value: c, label: c }))}
+          />
+          <FilterSelect
+            value={filterState}
+            onChange={setFilterState}
+            allLabel="All Status"
+            options={["active", "suspended", "graduated", "transferred", "inactive"].map((s) => ({
+              value: s,
+              label: cap(s),
+            }))}
+          />
         </SearchBar>
-        {rows.length === 0 ? <div className="py-10 text-center text-xs" style={{ color: 'hsl(var(--text3))' }}>No students found</div> : (
+        {rows.length === 0 ? (
+          <div className="py-10 text-center text-xs" style={{ color: "hsl(var(--text3))" }}>
+            No students found
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[12.5px]">
-              <thead><tr style={{ background: 'hsl(var(--surface2))', borderBottom: '2px solid hsl(var(--border))' }}>
-                {['Enrollment','Name','Form','Class','Gender', ...(isTeacher && !isAdmin ? ['Subjects','Relation'] : []), 'Status', ...(isAdmin ? ['Actions'] : [])].map(h => (
-                  <th key={h} className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'hsl(var(--text2))' }}>{h}</th>
-                ))}
-              </tr></thead>
+              <thead>
+                <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+                  {[
+                    "Enrollment",
+                    "Name",
+                    "Form",
+                    "Class",
+                    "Gender",
+                    ...(isTeacher && !isAdmin ? ["Subjects", "Relation"] : []),
+                    "Status",
+                    ...(isAdmin || (isClassTeacher && !isAdmin) ? ["Actions"] : []),
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: "hsl(var(--text2))" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
                 {rows.slice(0, 100).map((s: any) => (
-                  <tr key={s.id} className="hover:bg-[hsl(var(--surface2))] transition-colors" style={{ borderBottom: '1px solid #f6f8fa' }}>
-                    <td className="py-2.5 px-3.5 font-mono text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{s.enrollment_number || '—'}</td>
-                    <td className="py-2.5 px-3.5 font-semibold cursor-pointer" style={{ color: '#1a3fa0' }} onClick={() => setDetail(s.id)}>{s.full_name}</td>
+                  <tr
+                    key={s.id}
+                    className="hover:bg-[hsl(var(--surface2))] transition-colors"
+                    style={{ borderBottom: "1px solid #f6f8fa" }}
+                  >
+                    <td className="py-2.5 px-3.5 font-mono text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                      {s.enrollment_number || "—"}
+                    </td>
+                    <td
+                      className="py-2.5 px-3.5 font-semibold cursor-pointer"
+                      style={{ color: "#1a3fa0" }}
+                      onClick={() => setDetail(s.id)}
+                    >
+                      {s.full_name}
+                    </td>
                     <td className="py-2.5 px-3.5">{s.form}</td>
-                    <td className="py-2.5 px-3.5 text-[11px] font-mono">{s.class_name || '—'}</td>
-                    <td className="py-2.5 px-3.5 text-[11px]">{cap(s.gender || '')}</td>
+                    <td className="py-2.5 px-3.5 text-[11px] font-mono">{s.class_name || "—"}</td>
+                    <td className="py-2.5 px-3.5 text-[11px]">{cap(s.gender || "")}</td>
                     {isTeacher && !isAdmin && (
                       <>
-                        <td className="py-2.5 px-3.5 text-[10px]" style={{ color: 'hsl(var(--text2))' }}>
-                          {(studentSubjectMap[s.id] || []).join(', ') || '—'}
+                        <td className="py-2.5 px-3.5 text-[10px]" style={{ color: "hsl(var(--text2))" }}>
+                          {(studentSubjectMap[s.id] || []).join(", ") || "—"}
                         </td>
                         <td className="py-2.5 px-3.5">
                           <div className="flex gap-1">
                             {(studentSubjectMap[s.id] || []).length > 0 && (
-                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#ddf4ff', color: '#0969da' }}>Subject</span>
+                              <span
+                                className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                style={{ background: "#ddf4ff", color: "#0969da" }}
+                              >
+                                Subject
+                              </span>
                             )}
                             {classTeacherStudentIds.has(s.id) && (
-                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: '#dafbe1', color: '#1a7f37' }}>My Class</span>
+                              <span
+                                className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                style={{ background: "#dafbe1", color: "#1a7f37" }}
+                              >
+                                My Class
+                              </span>
                             )}
                           </div>
                         </td>
                       </>
                     )}
-                    <td className="py-2.5 px-3.5"><Badge status={s.state || 'active'} /></td>
+                    <td className="py-2.5 px-3.5">
+                      <Badge status={s.state || "active"} />
+                    </td>
                     {isAdmin && (
                       <td className="py-2.5 px-3.5">
                         <div className="flex gap-1">
-                          <Btn variant="outline" size="sm" onClick={(e: any) => { e.stopPropagation(); setModal(s.id); }}><i className="fas fa-edit" /></Btn>
-                          <Btn variant="danger" size="sm" onClick={async (e: any) => {
-                            e.stopPropagation();
-                            if (!confirm('Delete this student?')) return;
-                            await supabase.from('students').delete().eq('id', s.id);
-                            invalidate(['students']);
-                            showToast('Student deleted');
-                          }}><i className="fas fa-trash" /></Btn>
+                          <Btn
+                            variant="outline"
+                            size="sm"
+                            onClick={(e: any) => {
+                              e.stopPropagation();
+                              setModal(s.id);
+                            }}
+                          >
+                            <i className="fas fa-edit" />
+                          </Btn>
+                          <Btn
+                            variant="danger"
+                            size="sm"
+                            onClick={async (e: any) => {
+                              e.stopPropagation();
+                              if (!confirm("Delete this student?")) return;
+                              await supabase.from("students").delete().eq("id", s.id);
+                              invalidate(["students"]);
+                              showToast("Student deleted");
+                            }}
+                          >
+                            <i className="fas fa-trash" />
+                          </Btn>
                         </div>
                       </td>
+                    )}
+                    {isClassTeacher && !isAdmin && classTeacherStudentIds.has(s.id) && (
+                      <td className="py-2.5 px-3.5">
+                        <Btn
+                          variant="danger"
+                          size="sm"
+                          onClick={async (e: any) => {
+                            e.stopPropagation();
+                            if (
+                              !confirm(`Remove ${s.full_name} from your class? The student record will not be deleted.`)
+                            )
+                              return;
+                            await supabase.from("students").update({ class_name: null }).eq("id", s.id);
+                            invalidate(["students"]);
+                            showToast(`${s.full_name} removed from class`);
+                          }}
+                        >
+                          <i className="fas fa-user-minus mr-1" />
+                          Remove
+                        </Btn>
+                      </td>
+                    )}
+                    {isClassTeacher && !isAdmin && !classTeacherStudentIds.has(s.id) && (
+                      <td className="py-2.5 px-3.5" />
                     )}
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="text-[11px] mt-2.5" style={{ color: 'hsl(var(--text2))' }}>{Math.min(rows.length, 100)} of {rows.length} students</div>
+            <div className="text-[11px] mt-2.5" style={{ color: "hsl(var(--text2))" }}>
+              {Math.min(rows.length, 100)} of {rows.length} students
+            </div>
           </div>
         )}
       </Card>
-      {modal !== null && <StudentModal id={modal === 'new' ? null : modal} students={students} onClose={() => { setModal(null); invalidate(['students']); }} />}
+      {modal !== null && (
+        <StudentModal
+          id={modal === "new" ? null : modal}
+          students={students}
+          onClose={() => {
+            setModal(null);
+            invalidate(["students"]);
+          }}
+        />
+      )}
+      {ctModal && (
+        <ClassStudentModal
+          assignment={ctModal}
+          onClose={() => {
+            setCtModal(null);
+            invalidate(["students"]);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -212,53 +410,111 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: classTeachers = [] } = useClassTeachers();
   const s = students.find((x: any) => x.id === id) as any;
-  if (!s) return <><BackBtn onClick={onBack} label="Back" /><div>Not found</div></>;
+  if (!s)
+    return (
+      <>
+        <BackBtn onClick={onBack} label="Back" />
+        <div>Not found</div>
+      </>
+    );
 
   const classTeacher = classTeachers.find((ct: any) => ct.form === s.form && ct.class_name === s.class_name);
 
   return (
     <div className="page-animate">
       <BackBtn onClick={onBack} label="Back to Students" />
-      <div className="flex items-start gap-4 mb-5 pb-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-        <div className="w-[72px] h-[72px] rounded-[14px] flex items-center justify-center flex-shrink-0" style={{ background: 'hsl(var(--surface2))', border: '2px solid hsl(var(--border))' }}>
-          <i className={`fas fa-${s.gender === 'female' ? 'female' : 'male'}`} style={{ fontSize: '28px', color: '#1a3fa0' }} />
+      <div className="flex items-start gap-4 mb-5 pb-4" style={{ borderBottom: "1px solid hsl(var(--border))" }}>
+        <div
+          className="w-[72px] h-[72px] rounded-[14px] flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(var(--surface2))", border: "2px solid hsl(var(--border))" }}
+        >
+          <i
+            className={`fas fa-${s.gender === "female" ? "female" : "male"}`}
+            style={{ fontSize: "28px", color: "#1a3fa0" }}
+          />
         </div>
         <div>
           <div className="text-xl font-bold">{s.full_name}</div>
           <div className="flex gap-2 items-center flex-wrap mt-1.5">
-            <Badge status={s.state || 'active'} />
-            <span className="text-[11px] font-mono" style={{ color: 'hsl(var(--text2))' }}>{s.enrollment_number}</span>
-            <span className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{s.form} {s.class_name || ''}</span>
+            <Badge status={s.state || "active"} />
+            <span className="text-[11px] font-mono" style={{ color: "hsl(var(--text2))" }}>
+              {s.enrollment_number}
+            </span>
+            <span className="text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+              {s.form} {s.class_name || ""}
+            </span>
           </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Card title={<><i className="fas fa-id-card mr-1.5" />Personal Information</>}>
-          {[['Date of Birth', formatDate(s.date_of_birth)], ['Gender', cap(s.gender || '')], ['Form', s.form], ['Class', s.class_name || '—'], ['Enrollment', s.enrollment_number || '—'], ['Email', s.email || '—'], ['Nationality', s.nationality || '—'], ['Admission Date', formatDate(s.admission_date)]].map(([k, v]) => (
+        <Card
+          title={
+            <>
+              <i className="fas fa-id-card mr-1.5" />
+              Personal Information
+            </>
+          }
+        >
+          {[
+            ["Date of Birth", formatDate(s.date_of_birth)],
+            ["Gender", cap(s.gender || "")],
+            ["Form", s.form],
+            ["Class", s.class_name || "—"],
+            ["Enrollment", s.enrollment_number || "—"],
+            ["Email", s.email || "—"],
+            ["Nationality", s.nationality || "—"],
+            ["Admission Date", formatDate(s.admission_date)],
+          ].map(([k, v]) => (
             <InfoRow key={k} label={k} value={v} />
           ))}
         </Card>
         <div>
-          <Card title={<><i className="fas fa-chalkboard-teacher mr-1.5" />Class Teacher</>} className="mb-4">
+          <Card
+            title={
+              <>
+                <i className="fas fa-chalkboard-teacher mr-1.5" />
+                Class Teacher
+              </>
+            }
+            className="mb-4"
+          >
             <div className="text-[12.5px]">
               {classTeacher ? (
                 <span className="font-semibold">{classTeacher.teachers?.name}</span>
               ) : (
-                <span style={{ color: 'hsl(var(--text3))' }}>Not assigned</span>
+                <span style={{ color: "hsl(var(--text3))" }}>Not assigned</span>
               )}
             </div>
           </Card>
-          <Card title={<><i className="fas fa-book mr-1.5" />Subjects ({studentSubjects.length})</>}>
+          <Card
+            title={
+              <>
+                <i className="fas fa-book mr-1.5" />
+                Subjects ({studentSubjects.length})
+              </>
+            }
+          >
             {studentSubjects.length === 0 ? (
-              <div className="text-xs" style={{ color: 'hsl(var(--text3))' }}>No subjects assigned</div>
+              <div className="text-xs" style={{ color: "hsl(var(--text3))" }}>
+                No subjects assigned
+              </div>
             ) : (
               studentSubjects.map((ss: any) => (
-                  <div key={ss.id} className="flex justify-between py-[7px] text-[12.5px]" style={{ borderBottom: '1px solid #f6f8fa' }}>
-                    <span className="font-semibold">{ss.subjects?.name} <span className="font-mono text-[9px]" style={{ color: 'hsl(var(--text3))' }}>{ss.subjects?.code}</span></span>
-                    <span className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>
-                      {ss.teachers?.name || '—'}
+                <div
+                  key={ss.id}
+                  className="flex justify-between py-[7px] text-[12.5px]"
+                  style={{ borderBottom: "1px solid #f6f8fa" }}
+                >
+                  <span className="font-semibold">
+                    {ss.subjects?.name}{" "}
+                    <span className="font-mono text-[9px]" style={{ color: "hsl(var(--text3))" }}>
+                      {ss.subjects?.code}
                     </span>
-                  </div>
+                  </span>
+                  <span className="text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                    {ss.teachers?.name || "—"}
+                  </span>
+                </div>
               ))
             )}
           </Card>
@@ -271,25 +527,54 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
 function StudentModal({ id, students, onClose }: { id: string | null; students: any[]; onClose: () => void }) {
   const { showToast } = useApp();
   const existing = id ? students.find((s: any) => s.id === id) : null;
-  const [name, setName] = useState(existing?.full_name || '');
-  const [form, setForm] = useState(existing?.form || 'Form 1');
-  const [gender, setGender] = useState(existing?.gender || 'male');
-  const [enrollment, setEnrollment] = useState(existing?.enrollment_number || '');
-  const [className, setClassName] = useState(existing?.class_name || '');
-  const [email, setEmail] = useState(existing?.email || '');
-  const [state, setState] = useState(existing?.state || 'active');
+  const [name, setName] = useState(existing?.full_name || "");
+  const [form, setForm] = useState(existing?.form || "Form 1");
+  const [gender, setGender] = useState(existing?.gender || "male");
+  const [enrollment, setEnrollment] = useState(existing?.enrollment_number || "");
+  const [className, setClassName] = useState(existing?.class_name || "");
+  const [email, setEmail] = useState(existing?.email || "");
+  const [state, setState] = useState(existing?.state || "active");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
     if (id) {
-      const { error } = await supabase.from('students').update({ full_name: name, form, gender, enrollment_number: enrollment || null, class_name: className || null, email: email || null, state }).eq('id', id);
-      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
-      showToast('Student updated');
+      const { error } = await supabase
+        .from("students")
+        .update({
+          full_name: name,
+          form,
+          gender,
+          enrollment_number: enrollment || null,
+          class_name: className || null,
+          email: email || null,
+          state,
+        })
+        .eq("id", id);
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
+      showToast("Student updated");
     } else {
-      const { error } = await supabase.from('students').insert({ full_name: name, form, gender, enrollment_number: enrollment || null, class_name: className || null, email: email || null, state: 'active' });
-      if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+      const { error } = await supabase
+        .from("students")
+        .insert({
+          full_name: name,
+          form,
+          gender,
+          enrollment_number: enrollment || null,
+          class_name: className || null,
+          email: email || null,
+          state: "active",
+        });
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
       showToast(`Student "${name}" created`);
     }
     onClose();
@@ -297,26 +582,159 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={id ? 'Edit Student' : 'Add Student'} onClose={onClose} />
+      <ModalHead title={id ? "Edit Student" : "Add Student"} onClose={onClose} />
       <ModalBody>
         <FormSection title="Basic Information" />
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Full Name" required><FieldInput value={name} onChange={setName} /></Field>
-          <Field label="Form" required><FieldSelect value={form} onChange={setForm} options={FORMS.map(f => ({ value: f, label: f }))} /></Field>
+          <Field label="Full Name" required>
+            <FieldInput value={name} onChange={setName} />
+          </Field>
+          <Field label="Form" required>
+            <FieldSelect value={form} onChange={setForm} options={FORMS.map((f) => ({ value: f, label: f }))} />
+          </Field>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          <Field label="Gender"><FieldSelect value={gender} onChange={setGender} options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} /></Field>
-          <Field label="Enrollment #"><FieldInput value={enrollment} onChange={setEnrollment} /></Field>
-          <Field label="Class"><FieldInput value={className} onChange={setClassName} placeholder="e.g. B, M, K" /></Field>
+          <Field label="Gender">
+            <FieldSelect
+              value={gender}
+              onChange={setGender}
+              options={[
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+              ]}
+            />
+          </Field>
+          <Field label="Enrollment #">
+            <FieldInput value={enrollment} onChange={setEnrollment} />
+          </Field>
+          <Field label="Class">
+            <FieldInput value={className} onChange={setClassName} placeholder="e.g. B, M, K" />
+          </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Email"><FieldInput value={email} onChange={setEmail} type="email" /></Field>
-          {id && <Field label="Status"><FieldSelect value={state} onChange={setState} options={['active','suspended','graduated','transferred','inactive'].map(s => ({ value: s, label: cap(s) }))} /></Field>}
+          <Field label="Email">
+            <FieldInput value={email} onChange={setEmail} type="email" />
+          </Field>
+          {id && (
+            <Field label="Status">
+              <FieldSelect
+                value={state}
+                onChange={setState}
+                options={["active", "suspended", "graduated", "transferred", "inactive"].map((s) => ({
+                  value: s,
+                  label: cap(s),
+                }))}
+              />
+            </Field>
+          )}
         </div>
       </ModalBody>
       <ModalFoot>
-        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={save} disabled={saving}>{saving ? 'Saving…' : id ? 'Update' : 'Create'}</Btn>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn onClick={save} disabled={saving}>
+          {saving ? "Saving…" : id ? "Update" : "Create"}
+        </Btn>
+      </ModalFoot>
+    </Modal>
+  );
+}
+
+// ─── Class Teacher: Add Student to Class ─────────────────────────────────────
+
+function ClassStudentModal({
+  assignment,
+  onClose,
+}: {
+  assignment: { form: string; class_name: string };
+  onClose: () => void;
+}) {
+  const { showToast } = useApp();
+  const { data: students = [] } = useStudents();
+  // Existing student search
+  const [search, setSearch] = useState("");
+  const unassigned = students.filter(
+    (s: any) =>
+      s.state === "active" &&
+      (!s.class_name || s.class_name === "") &&
+      s.form === assignment.form &&
+      (!search ||
+        s.full_name.toLowerCase().includes(search.toLowerCase()) ||
+        (s.enrollment_number || "").toLowerCase().includes(search.toLowerCase())),
+  );
+
+  const assignExisting = async (student: any) => {
+    if (!confirm(`Assign ${student.full_name} to ${assignment.form} ${assignment.class_name}?`)) return;
+    const { error } = await supabase
+      .from("students")
+      .update({ class_name: assignment.class_name })
+      .eq("id", student.id);
+    if (error) {
+      showToast(error.message, "error");
+      return;
+    }
+    showToast(`${student.full_name} assigned to ${assignment.form} ${assignment.class_name}`);
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHead title={`Add Student — ${assignment.form} ${assignment.class_name}`} onClose={onClose} />
+      <ModalBody>
+        <div
+          className="rounded-md px-3 py-2 mb-3 text-[11.5px]"
+          style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
+        >
+          <i className="fas fa-info-circle mr-1.5" />
+          Showing <strong>{assignment.form}</strong> students not yet assigned to a class.
+        </div>
+        <input
+          className="w-full border rounded-md py-[7px] px-3 text-[12.5px] mb-3"
+          style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
+          placeholder="Search name or enrollment…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus
+        />
+        {unassigned.length === 0 ? (
+          <div className="py-6 text-center text-[12px]" style={{ color: "hsl(var(--text3))" }}>
+            <i className="fas fa-check-circle text-2xl mb-2 block" style={{ color: "#1a7f37" }} />
+            No unassigned {assignment.form} students found
+          </div>
+        ) : (
+          <div
+            className="max-h-[320px] overflow-y-auto border rounded-md divide-y"
+            style={{ borderColor: "hsl(var(--border))" }}
+          >
+            {unassigned.map((s: any) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between px-3 py-2.5 hover:bg-[hsl(var(--surface2))] transition-colors"
+              >
+                <div>
+                  <div className="text-[12.5px] font-semibold">{s.full_name}</div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text3))" }}>
+                    {s.enrollment_number ? `#${s.enrollment_number} · ` : ""}
+                    {cap(s.gender || "")}
+                  </div>
+                </div>
+                <Btn size="sm" onClick={() => assignExisting(s)}>
+                  <i className="fas fa-plus mr-1" />
+                  Assign
+                </Btn>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="text-[10px] mt-1.5" style={{ color: "hsl(var(--text3))" }}>
+          {unassigned.length} student(s) available
+        </div>
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
       </ModalFoot>
     </Modal>
   );
