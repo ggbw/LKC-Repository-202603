@@ -205,12 +205,41 @@ export default function StudentsPage() {
               New Student
             </Btn>
           )}
-          {isClassTeacher && !isAdmin && ctAssignments.length > 0 && (
-            <Btn onClick={() => setCtModal(ctAssignments[0])}>
-              <i className="fas fa-plus mr-1" />
-              Add Student
-            </Btn>
-          )}
+          {isClassTeacher &&
+            !isAdmin &&
+            ctAssignments.length > 0 &&
+            (ctAssignments.length === 1 ? (
+              <Btn onClick={() => setCtModal(ctAssignments[0])}>
+                <i className="fas fa-user-plus mr-1" />
+                Add Student to {ctAssignments[0].form} {ctAssignments[0].class_name}
+              </Btn>
+            ) : (
+              <div className="relative group">
+                <Btn>
+                  <i className="fas fa-user-plus mr-1" />
+                  Add Student <i className="fas fa-chevron-down ml-1 text-[10px]" />
+                </Btn>
+                <div
+                  className="absolute right-0 top-full mt-1 z-50 hidden group-hover:block rounded-lg shadow-lg overflow-hidden"
+                  style={{
+                    background: "hsl(var(--surface))",
+                    border: "1px solid hsl(var(--border))",
+                    minWidth: "180px",
+                  }}
+                >
+                  {ctAssignments.map((ca: any) => (
+                    <button
+                      key={`${ca.form}-${ca.class_name}`}
+                      onClick={() => setCtModal(ca)}
+                      className="w-full text-left px-4 py-2.5 text-[12px] font-semibold cursor-pointer border-none transition-colors hover:bg-[hsl(var(--surface2))]"
+                      style={{ background: "transparent", color: "hsl(var(--text))" }}
+                    >
+                      {ca.form} — {ca.class_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
         </div>
       </div>
       <Card>
@@ -559,17 +588,15 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
       }
       showToast("Student updated");
     } else {
-      const { error } = await supabase
-        .from("students")
-        .insert({
-          full_name: name,
-          form,
-          gender,
-          enrollment_number: enrollment || null,
-          class_name: className || null,
-          email: email || null,
-          state: "active",
-        });
+      const { error } = await supabase.from("students").insert({
+        full_name: name,
+        form,
+        gender,
+        enrollment_number: enrollment || null,
+        class_name: className || null,
+        email: email || null,
+        state: "active",
+      });
       if (error) {
         showToast(error.message, "error");
         setSaving(false);
@@ -641,7 +668,7 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
   );
 }
 
-// ─── Class Teacher: Add Student to Class ─────────────────────────────────────
+// ─── Class Teacher: Add / Remove Students ────────────────────────────────────
 
 function ClassStudentModal({
   assignment,
@@ -652,20 +679,34 @@ function ClassStudentModal({
 }) {
   const { showToast } = useApp();
   const { data: students = [] } = useStudents();
-  // Existing student search
+  const invalidate = useInvalidate();
+  const [tab, setTab] = useState<"add" | "remove">("add");
   const [search, setSearch] = useState("");
+
+  // Students already IN this class
+  const inClass = students.filter(
+    (s: any) => s.form === assignment.form && s.class_name === assignment.class_name && s.state === "active",
+  );
+
+  // Students in same form but NOT yet in any class (available to add)
   const unassigned = students.filter(
     (s: any) =>
       s.state === "active" &&
-      (!s.class_name || s.class_name === "") &&
       s.form === assignment.form &&
+      (!s.class_name || s.class_name === "") &&
       (!search ||
         s.full_name.toLowerCase().includes(search.toLowerCase()) ||
         (s.enrollment_number || "").toLowerCase().includes(search.toLowerCase())),
   );
 
-  const assignExisting = async (student: any) => {
-    if (!confirm(`Assign ${student.full_name} to ${assignment.form} ${assignment.class_name}?`)) return;
+  const filteredInClass = inClass.filter(
+    (s: any) =>
+      !search ||
+      s.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      (s.enrollment_number || "").toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const assignStudent = async (student: any) => {
     const { error } = await supabase
       .from("students")
       .update({ class_name: assignment.class_name })
@@ -674,21 +715,55 @@ function ClassStudentModal({
       showToast(error.message, "error");
       return;
     }
-    showToast(`${student.full_name} assigned to ${assignment.form} ${assignment.class_name}`);
-    onClose();
+    showToast(`${student.full_name} added to ${assignment.form} ${assignment.class_name}`);
+    invalidate(["students"]);
+  };
+
+  const removeStudent = async (student: any) => {
+    if (
+      !confirm(
+        `Remove ${student.full_name} from ${assignment.form} ${assignment.class_name}?\nThe student record will NOT be deleted.`,
+      )
+    )
+      return;
+    const { error } = await supabase.from("students").update({ class_name: null }).eq("id", student.id);
+    if (error) {
+      showToast(error.message, "error");
+      return;
+    }
+    showToast(`${student.full_name} removed from class`);
+    invalidate(["students"]);
   };
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={`Add Student — ${assignment.form} ${assignment.class_name}`} onClose={onClose} />
+      <ModalHead title={`Manage Class — ${assignment.form} ${assignment.class_name}`} onClose={onClose} />
       <ModalBody>
-        <div
-          className="rounded-md px-3 py-2 mb-3 text-[11.5px]"
-          style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
-        >
-          <i className="fas fa-info-circle mr-1.5" />
-          Showing <strong>{assignment.form}</strong> students not yet assigned to a class.
+        {/* Tab switcher */}
+        <div className="flex gap-1 mb-3 p-1 rounded-lg" style={{ background: "hsl(var(--surface2))" }}>
+          {[
+            { key: "add", label: `Add Students (${unassigned.length} available)`, icon: "fa-user-plus" },
+            { key: "remove", label: `Class Roster (${inClass.length})`, icon: "fa-users" },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => {
+                setTab(t.key as any);
+                setSearch("");
+              }}
+              className="flex-1 py-1.5 px-2 rounded-md text-[11px] font-semibold border-none cursor-pointer transition-all"
+              style={{
+                background: tab === t.key ? "hsl(var(--surface))" : "transparent",
+                color: tab === t.key ? "hsl(var(--text))" : "hsl(var(--text2))",
+                boxShadow: tab === t.key ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              }}
+            >
+              <i className={`fas ${t.icon} mr-1`} />
+              {t.label}
+            </button>
+          ))}
         </div>
+
         <input
           className="w-full border rounded-md py-[7px] px-3 text-[12.5px] mb-3"
           style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
@@ -697,43 +772,89 @@ function ClassStudentModal({
           onChange={(e) => setSearch(e.target.value)}
           autoFocus
         />
-        {unassigned.length === 0 ? (
-          <div className="py-6 text-center text-[12px]" style={{ color: "hsl(var(--text3))" }}>
-            <i className="fas fa-check-circle text-2xl mb-2 block" style={{ color: "#1a7f37" }} />
-            No unassigned {assignment.form} students found
-          </div>
-        ) : (
-          <div
-            className="max-h-[320px] overflow-y-auto border rounded-md divide-y"
-            style={{ borderColor: "hsl(var(--border))" }}
-          >
-            {unassigned.map((s: any) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between px-3 py-2.5 hover:bg-[hsl(var(--surface2))] transition-colors"
-              >
-                <div>
-                  <div className="text-[12.5px] font-semibold">{s.full_name}</div>
-                  <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text3))" }}>
-                    {s.enrollment_number ? `#${s.enrollment_number} · ` : ""}
-                    {cap(s.gender || "")}
-                  </div>
-                </div>
-                <Btn size="sm" onClick={() => assignExisting(s)}>
-                  <i className="fas fa-plus mr-1" />
-                  Assign
-                </Btn>
+
+        {/* ADD tab */}
+        {tab === "add" && (
+          <>
+            <div
+              className="rounded-md px-3 py-2 mb-2 text-[11px]"
+              style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
+            >
+              <i className="fas fa-info-circle mr-1" />
+              Showing <strong>{assignment.form}</strong> students not yet assigned to any class.
+            </div>
+            {unassigned.length === 0 ? (
+              <div className="py-8 text-center text-[12px]" style={{ color: "hsl(var(--text3))" }}>
+                <i className="fas fa-check-circle text-2xl mb-2 block" style={{ color: "#1a7f37" }} />
+                No unassigned {assignment.form} students found
               </div>
-            ))}
-          </div>
+            ) : (
+              <div
+                className="max-h-[300px] overflow-y-auto border rounded-md divide-y"
+                style={{ borderColor: "hsl(var(--border))" }}
+              >
+                {unassigned.map((s: any) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between px-3 py-2.5 hover:bg-[hsl(var(--surface2))] transition-colors"
+                  >
+                    <div>
+                      <div className="text-[12.5px] font-semibold">{s.full_name}</div>
+                      <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text3))" }}>
+                        {s.enrollment_number ? `#${s.enrollment_number} · ` : ""}
+                        {cap(s.gender || "")}
+                      </div>
+                    </div>
+                    <Btn size="sm" onClick={() => assignStudent(s)}>
+                      <i className="fas fa-plus mr-1" />
+                      Add
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
-        <div className="text-[10px] mt-1.5" style={{ color: "hsl(var(--text3))" }}>
-          {unassigned.length} student(s) available
-        </div>
+
+        {/* REMOVE / ROSTER tab */}
+        {tab === "remove" && (
+          <>
+            {filteredInClass.length === 0 ? (
+              <div className="py-8 text-center text-[12px]" style={{ color: "hsl(var(--text3))" }}>
+                <i className="fas fa-users text-2xl mb-2 block" style={{ color: "hsl(var(--text3))" }} />
+                No students in {assignment.form} {assignment.class_name} yet
+              </div>
+            ) : (
+              <div
+                className="max-h-[300px] overflow-y-auto border rounded-md divide-y"
+                style={{ borderColor: "hsl(var(--border))" }}
+              >
+                {filteredInClass.map((s: any) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between px-3 py-2.5 hover:bg-[hsl(var(--surface2))] transition-colors"
+                  >
+                    <div>
+                      <div className="text-[12.5px] font-semibold">{s.full_name}</div>
+                      <div className="text-[10px] mt-0.5" style={{ color: "hsl(var(--text3))" }}>
+                        {s.enrollment_number ? `#${s.enrollment_number} · ` : ""}
+                        {cap(s.gender || "")}
+                      </div>
+                    </div>
+                    <Btn variant="danger" size="sm" onClick={() => removeStudent(s)}>
+                      <i className="fas fa-user-minus mr-1" />
+                      Remove
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </ModalBody>
       <ModalFoot>
         <Btn variant="outline" onClick={onClose}>
-          Cancel
+          Done
         </Btn>
       </ModalFoot>
     </Modal>
