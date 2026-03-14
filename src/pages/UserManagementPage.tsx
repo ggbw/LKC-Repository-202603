@@ -74,10 +74,11 @@ export default function UserManagementPage() {
   const [importModal, setImportModal] = useState(false);
   const [bulkModal, setBulkModal] = useState(false);
   const [resetModal, setResetModal] = useState<any>(null);
+  const [editModal, setEditModal] = useState<UnifiedUser | null>(null);
+  const [deleteModal, setDeleteModal] = useState<UnifiedUser | null>(null);
   const [newUsers, setNewUsers] = useState<{ email: string; password: string; name: string; role: string }[]>([]);
 
   const isLoading = pLoading || tLoading || sLoading || prLoading;
-
   const getRoles = (userId: string) => userRoles.filter((r: any) => r.user_id === userId).map((r: any) => r.role);
 
   const unifiedUsers = useMemo(() => {
@@ -104,6 +105,8 @@ export default function UserManagementPage() {
         const e = userMap.get(t.user_id)!;
         e.source.push("teacher");
         e.department = t.department;
+        e.linkTable = "teachers";
+        e.linkId = t.id;
       } else {
         userMap.set(`teacher-${t.id}`, {
           id: `teacher-${t.id}`,
@@ -128,6 +131,10 @@ export default function UserManagementPage() {
         const e = userMap.get(s.user_id)!;
         e.source.push("student");
         e.form = s.form;
+        if (!e.linkTable) {
+          e.linkTable = "students";
+          e.linkId = s.id;
+        }
       } else {
         userMap.set(`student-${s.id}`, {
           id: `student-${s.id}`,
@@ -222,13 +229,28 @@ export default function UserManagementPage() {
     showToast("Users exported");
   };
 
-  const downloadTemplate = () => {
-    downloadExcel(
-      [{ Name: "John Doe", Email: "john@school.com", Role: "teacher" }],
-      "user_import_template",
-      "Template",
-    );
-    showToast("Template downloaded");
+  // ── Delete user handler ──
+  const handleDelete = async (u: UnifiedUser) => {
+    if (u.hasAccount && u.userId) {
+      // Delete from auth (cascades to profiles and user_roles via FK)
+      const { data, error } = await supabase.functions.invoke("create-user", {
+        body: { action: "delete_user", user_id: u.userId },
+      });
+      if (error || data?.error) {
+        showToast(data?.error || error?.message || "Failed to delete user", "error");
+        return;
+      }
+      // Un-link source tables
+      if (u.linkTable && u.linkId) {
+        await (supabase as any).from(u.linkTable).update({ user_id: null }).eq("id", u.linkId);
+      }
+    } else if (u.linkTable && u.linkId) {
+      // No auth account — delete the person record itself
+      await (supabase as any).from(u.linkTable).delete().eq("id", u.linkId);
+    }
+    showToast(`${u.name} deleted`);
+    setDeleteModal(null);
+    invalidate(["profiles", "user_roles", "teachers", "students", "parents"]);
   };
 
   if (!isAdmin)
@@ -380,7 +402,12 @@ export default function UserManagementPage() {
                     {!u.form && !u.department && <span>{u.createdAt?.split("T")[0] || "—"}</span>}
                   </td>
                   <td className="py-2.5 px-3.5">
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 flex-wrap">
+                      {/* Edit button — always shown */}
+                      <Btn variant="outline" size="sm" onClick={() => setEditModal(u)}>
+                        <i className="fas fa-edit mr-1" />
+                        Edit
+                      </Btn>
                       {u.hasAccount ? (
                         <Btn
                           variant="outline"
@@ -426,6 +453,10 @@ export default function UserManagementPage() {
                           Create
                         </Btn>
                       )}
+                      {/* Delete button */}
+                      <Btn variant="danger" size="sm" onClick={() => setDeleteModal(u)}>
+                        <i className="fas fa-trash" />
+                      </Btn>
                     </div>
                   </td>
                 </tr>
@@ -453,7 +484,6 @@ export default function UserManagementPage() {
           }}
         />
       )}
-
       {importModal && (
         <ImportUsersModal
           onClose={(imported) => {
@@ -465,7 +495,6 @@ export default function UserManagementPage() {
           }}
         />
       )}
-
       {bulkModal && (
         <BulkCreateModal
           users={usersWithoutAccounts}
@@ -478,7 +507,6 @@ export default function UserManagementPage() {
           }}
         />
       )}
-
       {resetModal && (
         <ResetPasswordModal
           profile={resetModal}
@@ -488,7 +516,166 @@ export default function UserManagementPage() {
           }}
         />
       )}
+      {editModal && (
+        <EditUserModal
+          user={editModal}
+          onClose={() => {
+            setEditModal(null);
+            invalidate(["profiles", "user_roles", "teachers", "students", "parents"]);
+          }}
+        />
+      )}
+      {deleteModal && (
+        <DeleteUserModal
+          user={deleteModal}
+          onClose={() => setDeleteModal(null)}
+          onConfirm={() => handleDelete(deleteModal)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Edit User Modal ── */
+function EditUserModal({ user, onClose }: { user: UnifiedUser; onClose: () => void }) {
+  const { showToast } = useApp();
+  const [name, setName] = useState(user.name);
+  const [email, setEmail] = useState(user.email || "");
+  const [dept, setDept] = useState(user.department || "");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+
+    // Update profile if user has an account
+    if (user.userId) {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: name, email: email || null })
+        .eq("user_id", user.userId);
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Update source record
+    if (user.linkTable && user.linkId) {
+      const nameField = user.linkTable === "students" ? "full_name" : "name";
+      const updates: any = { [nameField]: name, email: email || null };
+      if (user.linkTable === "teachers") updates.department = dept || null;
+      await (supabase as any).from(user.linkTable).update(updates).eq("id", user.linkId);
+    }
+
+    showToast(`${name} updated`);
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHead title="Edit User" onClose={onClose} />
+      <ModalBody>
+        <Field label="Full Name" required>
+          <FieldInput value={name} onChange={setName} />
+        </Field>
+        <Field label="Email">
+          <FieldInput value={email} onChange={setEmail} type="email" />
+        </Field>
+        {(user.source.includes("teacher") || user.roles.includes("teacher")) && (
+          <Field label="Department">
+            <select
+              className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+              style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
+              value={dept}
+              onChange={(e) => setDept(e.target.value)}
+            >
+              <option value="">— Select Department —</option>
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <div
+          className="rounded-md px-3 py-2 text-[11px]"
+          style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}
+        >
+          <i className="fas fa-info-circle mr-1" />
+          Changes update both the login profile and the linked people record.
+        </div>
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save Changes"}
+        </Btn>
+      </ModalFoot>
+    </Modal>
+  );
+}
+
+/* ── Delete User Confirmation Modal ── */
+function DeleteUserModal({
+  user,
+  onClose,
+  onConfirm,
+}: {
+  user: UnifiedUser;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <Modal onClose={onClose} size="sm">
+      <ModalHead title="Delete User" onClose={onClose} />
+      <ModalBody>
+        <div className="text-[12.5px] mb-3">
+          Are you sure you want to delete <strong>{user.name}</strong>?
+        </div>
+        {user.hasAccount && (
+          <div
+            className="rounded-md px-3 py-2 text-[11px] mb-2"
+            style={{ background: "#ffebe9", border: "1px solid #ffcecb", color: "#cf222e" }}
+          >
+            <i className="fas fa-exclamation-triangle mr-1" />
+            This will <strong>delete their login account</strong>. They will no longer be able to sign in. The
+            underlying {user.source.filter((s) => s !== "profile").join("/") || "person"} record will be kept but
+            unlinked.
+          </div>
+        )}
+        {!user.hasAccount && (
+          <div
+            className="rounded-md px-3 py-2 text-[11px]"
+            style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
+          >
+            <i className="fas fa-info-circle mr-1" />
+            This person has no system account. Their {user.linkTable} record will be permanently deleted.
+          </div>
+        )}
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn
+          variant="danger"
+          disabled={confirming}
+          onClick={() => {
+            setConfirming(true);
+            onConfirm();
+          }}
+        >
+          {confirming ? "Deleting…" : "Delete"}
+        </Btn>
+      </ModalFoot>
+    </Modal>
   );
 }
 
@@ -509,7 +696,6 @@ function BulkCreateModal({
     setProcessing(true);
     const total = users.length;
     setProgress({ done: 0, total, failed: 0 });
-
     const batchSize = 10;
     const allResults: any[] = [];
 
@@ -521,26 +707,23 @@ function BulkCreateModal({
         link_table: u.linkTable,
         link_id: u.linkId,
       }));
-
       const { data, error } = await supabase.functions.invoke("create-user", {
         body: { action: "bulk_create", users: batch },
       });
-
       if (error) {
         batch.forEach((b) => allResults.push({ ...b, success: false, error: error.message }));
       } else if (data?.results) {
         allResults.push(...data.results);
       }
-
-      const successCount = allResults.filter((r) => r.success).length;
-      const failedCount = allResults.filter((r) => !r.success).length;
-      setProgress({ done: successCount + failedCount, total, failed: failedCount });
+      const s = allResults.filter((r) => r.success).length;
+      const f = allResults.filter((r) => !r.success).length;
+      setProgress({ done: s + f, total, failed: f });
     }
 
     setResults(allResults);
     setProcessing(false);
     const created = allResults.filter((r) => r.success);
-    showToast(`${created.length}/${total} accounts created${progress.failed > 0 ? `, ${progress.failed} failed` : ""}`);
+    showToast(`${created.length}/${total} accounts created`);
   };
 
   return (
@@ -550,14 +733,13 @@ function BulkCreateModal({
         {!results ? (
           <>
             <div className="text-xs mb-3" style={{ color: "hsl(var(--text2))" }}>
-              Create accounts for <strong>{users.length}</strong> people who don't have system accounts yet. Each will
-              get a generated password (firstname + 4 digits).
+              Create accounts for <strong>{users.length}</strong> people without system accounts.
             </div>
             <div
               className="rounded-md px-3 py-2 text-[11px] mb-3"
               style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
             >
-              ⚠ Only users with email addresses will get accounts. Users without emails will be skipped.
+              ⚠ Only users with email addresses will get accounts.
             </div>
             <div
               className="max-h-[200px] overflow-y-auto rounded border text-[11px]"
@@ -639,12 +821,11 @@ function BulkCreateModal({
               variant="outline"
               onClick={() => {
                 const created = results.filter((r) => r.success);
-                if (created.length > 0) {
+                if (created.length > 0)
                   downloadCSV(
                     created.map((r) => ({ Name: r.name, Email: r.email, Password: r.password, Role: r.role })),
                     "bulk_credentials",
                   );
-                }
               }}
             >
               <i className="fas fa-download mr-1" />
@@ -685,21 +866,18 @@ function ImportUsersModal({
     if (!file) return;
     try {
       const data = await parseExcel(file);
-      // Normalize column names
       const normalized = data
         .map((row) => {
           const r: any = {};
           Object.keys(row).forEach((k) => {
             const lower = k.toLowerCase().trim();
-            if (lower === "name" || lower === "full name" || lower === "full_name" || lower === "fullname")
-              r.name = row[k];
-            else if (lower === "email" || lower === "e-mail") r.email = row[k];
-            else if (lower === "role" || lower === "type") r.role = row[k]?.toLowerCase();
+            if (["name", "full name", "full_name", "fullname"].includes(lower)) r.name = row[k];
+            else if (["email", "e-mail"].includes(lower)) r.email = row[k];
+            else if (["role", "type"].includes(lower)) r.role = row[k]?.toLowerCase();
           });
           return r;
         })
         .filter((r) => r.name && r.email);
-
       if (normalized.length === 0) {
         showToast("No valid rows found. Ensure columns: Name, Email, Role", "error");
         return;
@@ -714,16 +892,9 @@ function ImportUsersModal({
     setProcessing(true);
     const total = rows.length;
     setProgress({ done: 0, total });
-
-    const batch = rows.map((r) => ({
-      email: r.email,
-      full_name: r.name,
-      role: r.role || "teacher",
-    }));
-
+    const batch = rows.map((r) => ({ email: r.email, full_name: r.name, role: r.role || "teacher" }));
     const batchSize = 10;
     const allResults: any[] = [];
-
     for (let i = 0; i < batch.length; i += batchSize) {
       const chunk = batch.slice(i, i + batchSize);
       const { data, error } = await supabase.functions.invoke("create-user", {
@@ -736,14 +907,12 @@ function ImportUsersModal({
       }
       setProgress({ done: Math.min(i + batchSize, total), total });
     }
-
     setResults(allResults);
     setProcessing(false);
-    const created = allResults.filter((r) => r.success);
-    showToast(`${created.length}/${total} users imported`);
+    showToast(`${allResults.filter((r) => r.success).length}/${total} users imported`);
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = () =>
     downloadExcel(
       [
         { Name: "John Doe", Email: "john@school.com", Role: "teacher" },
@@ -752,7 +921,6 @@ function ImportUsersModal({
       "user_import_template",
       "Template",
     );
-  };
 
   return (
     <Modal onClose={() => onClose()} size="lg">
@@ -762,7 +930,7 @@ function ImportUsersModal({
           <>
             <div className="text-xs mb-3" style={{ color: "hsl(var(--text2))" }}>
               Upload an Excel/CSV file with columns: <strong>Name</strong>, <strong>Email</strong>,{" "}
-              <strong>Role</strong> (teacher/student/parent/admin).
+              <strong>Role</strong>.
             </div>
             <div className="flex gap-2 mb-3">
               <Btn variant="outline" onClick={downloadTemplate}>
@@ -866,10 +1034,10 @@ function ImportUsersModal({
             <Btn
               variant="outline"
               onClick={() => {
-                const created = results.filter((r) => r.success);
-                if (created.length > 0)
+                const c = results.filter((r) => r.success);
+                if (c.length > 0)
                   downloadCSV(
-                    created.map((r) => ({ Name: r.name, Email: r.email, Password: r.password, Role: r.role })),
+                    c.map((r) => ({ Name: r.name, Email: r.email, Password: r.password, Role: r.role })),
                     "imported_credentials",
                   );
               }}
@@ -954,33 +1122,52 @@ function CreateUserModal({
   onClose: (created?: { email: string; password: string; name: string; role: string }) => void;
 }) {
   const { showToast } = useApp();
+  const { data: teachers = [] } = useTeachers();
+  const { data: students = [] } = useStudents();
+  const { data: parents = [] } = useParents();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("teacher");
   const [dept, setDept] = useState("");
+  const [linkMode, setLinkMode] = useState<"new" | "existing">("new");
+  const [linkId, setLinkId] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const linkableRecords = useMemo(() => {
+    const table = role === "teacher" ? teachers : role === "student" ? students : parents;
+    // Only show unlinked records (no user_id)
+    return (table as any[]).filter((r: any) => !r.user_id);
+  }, [role, teachers, students, parents]);
 
   const save = async () => {
     if (!name.trim() || !email.trim()) return;
     setSaving(true);
     const password = (name.split(" ")[0]?.toLowerCase() || "user") + Math.floor(1000 + Math.random() * 9000);
+
+    let finalLinkTable: string | undefined;
+    let finalLinkId: string | undefined;
+
+    if (linkMode === "existing" && linkId) {
+      finalLinkTable = role === "teacher" ? "teachers" : role === "student" ? "students" : "parents";
+      finalLinkId = linkId;
+    }
+
     const { data, error } = await supabase.functions.invoke("create-user", {
-      body: { email, password, full_name: name, role },
+      body: { email, password, full_name: name, role, link_table: finalLinkTable, link_id: finalLinkId },
     });
     if (error || data?.error) {
       showToast(data?.error || error?.message || "Failed to create user", "error");
       setSaving(false);
       return;
     }
-    // If teacher, create the teachers row linked to the new user
-    if (role === "teacher" && data?.user_id) {
-      await (supabase as any).from("teachers").insert({
-        name: name.trim(),
-        email: email.trim(),
-        department: dept || null,
-        user_id: data.user_id,
-      });
+
+    // If teacher and creating new record, create the teachers row
+    if (role === "teacher" && linkMode === "new" && data?.user_id) {
+      await (supabase as any)
+        .from("teachers")
+        .insert({ name: name.trim(), email: email.trim(), department: dept || null, user_id: data.user_id });
     }
+
     showToast(`User "${name}" created with password: ${password}`);
     onClose({ email, password, name, role });
   };
@@ -1000,6 +1187,7 @@ function CreateUserModal({
             value={role}
             onChange={(v) => {
               setRole(v);
+              setLinkId("");
               if (v !== "teacher") setDept("");
             }}
             options={[
@@ -1025,6 +1213,45 @@ function CreateUserModal({
                 </option>
               ))}
             </select>
+          </Field>
+        )}
+        {/* Link to existing person record */}
+        {["teacher", "student", "parent"].includes(role) && linkableRecords.length > 0 && (
+          <Field label="Link to existing record?">
+            <div className="flex gap-2 mb-2">
+              {["new", "existing"].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => {
+                    setLinkMode(m as any);
+                    setLinkId("");
+                  }}
+                  className="px-3 py-1.5 rounded text-[11px] font-semibold border cursor-pointer"
+                  style={{
+                    background: linkMode === m ? "hsl(var(--primary))" : "hsl(var(--surface2))",
+                    color: linkMode === m ? "#fff" : "hsl(var(--text2))",
+                    borderColor: "hsl(var(--border))",
+                  }}
+                >
+                  {m === "new" ? "Create new record" : "Link to existing"}
+                </button>
+              ))}
+            </div>
+            {linkMode === "existing" && (
+              <select
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
+                value={linkId}
+                onChange={(e) => setLinkId(e.target.value)}
+              >
+                <option value="">— Select existing {role} —</option>
+                {linkableRecords.map((r: any) => (
+                  <option key={r.id} value={r.id}>
+                    {r.full_name || r.name} {r.email ? `(${r.email})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
         )}
         <div
