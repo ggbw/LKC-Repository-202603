@@ -219,6 +219,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: results = [] } = useExamResults(exam?.name);
   const [resultModal, setResultModal] = useState(false);
   const [commentModal, setCommentModal] = useState<any>(null);
+  const [editMarksModal, setEditMarksModal] = useState<any>(null);
   const [filterSubject, setFilterSubject] = useState("");
 
   if (!exam)
@@ -382,9 +383,15 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
                       </td>
                       <td className="py-2.5 px-3.5">
                         {(isAdmin || isTeacher || isHOD) && (
-                          <Btn variant="outline" size="sm" onClick={() => setCommentModal(r)}>
-                            <i className="fas fa-comment mr-1" />
-                          </Btn>
+                          <div className="flex gap-1">
+                            <Btn variant="outline" size="sm" onClick={() => setEditMarksModal(r)} title="Edit marks">
+                              <i className="fas fa-pen mr-1" />
+                              Marks
+                            </Btn>
+                            <Btn variant="outline" size="sm" onClick={() => setCommentModal(r)} title="Edit comments">
+                              <i className="fas fa-comment" />
+                            </Btn>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -422,11 +429,94 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
           }}
         />
       )}
+
+      {editMarksModal && (
+        <EditMarksModal
+          result={editMarksModal}
+          onClose={() => {
+            setEditMarksModal(null);
+            invalidate(["exam_results"]);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// ─── Comment Modal ───────────────────────────────────────────────────────────
+// ─── Edit Marks Modal ────────────────────────────────────────────────────────
+
+function EditMarksModal({ result, onClose }: { result: any; onClose: () => void }) {
+  const { showToast } = useApp();
+  const [obtainedMarks, setObtainedMarks] = useState(result.obtained_marks?.toString() || "");
+  const [maxMarks, setMaxMarks] = useState(result.max_marks?.toString() || "100");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (obtainedMarks === "" || maxMarks === "") {
+      showToast("Both marks fields are required", "error");
+      return;
+    }
+    if (Number(obtainedMarks) > Number(maxMarks)) {
+      showToast("Obtained marks cannot exceed maximum marks", "error");
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("exam_results")
+      .update({ obtained_marks: Number(obtainedMarks), max_marks: Number(maxMarks) })
+      .eq("id", result.id);
+    if (error) {
+      showToast(error.message, "error");
+      setSaving(false);
+      return;
+    }
+    showToast(`Marks updated for ${result.students?.full_name}`);
+    onClose();
+  };
+
+  const pct = maxMarks && obtainedMarks ? Math.round((Number(obtainedMarks) / Number(maxMarks)) * 100) : null;
+
+  return (
+    <Modal onClose={onClose} size="sm">
+      <ModalHead title="Edit Marks" onClose={onClose} />
+      <ModalBody>
+        <div className="text-[12px] mb-3" style={{ color: "hsl(var(--text2))" }}>
+          <strong>{result.students?.full_name}</strong> — {result.subjects?.name}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Obtained Marks" required>
+            <FieldInput value={obtainedMarks} onChange={setObtainedMarks} type="number" placeholder="e.g. 78" />
+          </Field>
+          <Field label="Maximum Marks" required>
+            <FieldInput value={maxMarks} onChange={setMaxMarks} type="number" placeholder="e.g. 100" />
+          </Field>
+        </div>
+        {pct !== null && (
+          <div
+            className="rounded-md px-3 py-2 text-[11px] text-center font-semibold mt-2"
+            style={{
+              background: pct >= 50 ? "#dafbe1" : "#ffebe9",
+              border: `1px solid ${pct >= 50 ? "#aceebb" : "#ffcecb"}`,
+              color: pct >= 50 ? "#1a7f37" : "#cf222e",
+            }}
+          >
+            {obtainedMarks}/{maxMarks} = {pct}% — {G(pct)}
+          </div>
+        )}
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Update Marks"}
+        </Btn>
+      </ModalFoot>
+    </Modal>
+  );
+}
+
+// ─── Comment Modal ────────────────────────────────────────────────────────────
 
 function CommentModal({ result, onClose }: { result: any; onClose: () => void }) {
   const { showToast } = useApp();
