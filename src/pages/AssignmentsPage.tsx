@@ -274,6 +274,7 @@ function AssignmentDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const invalidate = useInvalidate();
   const a = assignments.find((x: any) => x.id === id) as any;
   const [submitModal, setSubmitModal] = useState(false);
+  const [previewModal, setPreviewModal] = useState<any>(null);
 
   if (!a)
     return (
@@ -420,17 +421,16 @@ function AssignmentDetail({ id, onBack }: { id: string; onBack: () => void }) {
                     <td className="py-2.5 px-3.5 font-mono text-[11px]">{formatDateTime(s.submitted_at)}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">
                       {s.submission_file ? (
-                        <a
-                          href={s.submission_file}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 font-semibold no-underline"
+                        <button
+                          className="inline-flex items-center gap-1 font-semibold cursor-pointer bg-transparent border-none p-0"
                           style={{ color: "#1a7f37" }}
+                          onClick={() => setPreviewModal(s)}
+                          title="Preview softcopy submission"
                         >
                           <i className="fas fa-file-alt" />
                           Softcopy
-                          <i className="fas fa-external-link-alt text-[9px]" />
-                        </a>
+                          <i className="fas fa-eye text-[9px]" />
+                        </button>
                       ) : s.submission_text ? (
                         "Softcopy"
                       ) : (
@@ -470,7 +470,101 @@ function AssignmentDetail({ id, onBack }: { id: string; onBack: () => void }) {
           }}
         />
       )}
+
+      {previewModal && <SoftcopyPreviewModal submission={previewModal} onClose={() => setPreviewModal(null)} />}
     </div>
+  );
+}
+
+// ─── Softcopy Preview Modal ───────────────────────────────────────────────────
+
+function SoftcopyPreviewModal({ submission, onClose }: { submission: any; onClose: () => void }) {
+  const url = submission.submission_file;
+  const fileName = url?.split("/").pop()?.split("?")[0] || "submission";
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext);
+  const isPdf = ext === "pdf";
+  const isDoc = ["doc", "docx", "ppt", "pptx", "xls", "xlsx"].includes(ext);
+
+  // Google Docs Viewer works well for office files
+  const viewerUrl = isDoc ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true` : url;
+
+  return (
+    <Modal onClose={onClose} size="lg">
+      <ModalHead title={`Submission — ${submission.students?.full_name || "Student"}`} onClose={onClose} />
+      <ModalBody>
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+            <i className="fas fa-file mr-1" />
+            {fileName}
+          </div>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-[11px] font-semibold no-underline px-2.5 py-1 rounded border"
+            style={{ color: "#0969da", borderColor: "#addcff", background: "#ddf4ff" }}
+          >
+            <i className="fas fa-external-link-alt" />
+            Open in new tab
+          </a>
+        </div>
+
+        {isImage && (
+          <img
+            src={url}
+            alt="submission"
+            className="w-full rounded-lg"
+            style={{ maxHeight: "500px", objectFit: "contain", background: "#f6f8fa" }}
+          />
+        )}
+
+        {isPdf && (
+          <iframe
+            src={`${url}#toolbar=0`}
+            className="w-full rounded-lg border"
+            style={{ height: "500px", borderColor: "hsl(var(--border))" }}
+            title="PDF Preview"
+          />
+        )}
+
+        {isDoc && (
+          <iframe
+            src={viewerUrl}
+            className="w-full rounded-lg border"
+            style={{ height: "500px", borderColor: "hsl(var(--border))" }}
+            title="Document Preview"
+          />
+        )}
+
+        {!isImage && !isPdf && !isDoc && (
+          <div
+            className="rounded-lg py-12 text-center"
+            style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}
+          >
+            <i className="fas fa-file-alt text-4xl mb-3 block" style={{ color: "hsl(var(--text3))" }} />
+            <div className="text-[12px] font-semibold mb-1">Preview not available for this file type</div>
+            <div className="text-[11px] mb-3" style={{ color: "hsl(var(--text2))" }}>
+              Use the button above to open the file directly.
+            </div>
+          </div>
+        )}
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          Close
+        </Btn>
+        <a
+          href={url}
+          download
+          className="inline-flex items-center gap-1.5 px-3.5 py-[7px] rounded-md text-xs font-semibold no-underline cursor-pointer"
+          style={{ background: "hsl(var(--primary))", color: "#fff" }}
+        >
+          <i className="fas fa-download mr-1" />
+          Download
+        </a>
+      </ModalFoot>
+    </Modal>
   );
 }
 
@@ -486,15 +580,17 @@ function GradeSubmissionBtn({
   onDone: () => void;
 }) {
   const { showToast } = useApp();
+  const alreadyGraded = submission.obtained_marks !== null;
   const [grading, setGrading] = useState(false);
+  // Pre-populate with existing marks when editing
   const [marks, setMarks] = useState(submission.obtained_marks?.toString() || "");
   const [comment, setComment] = useState(submission.teacher_comment || "");
 
   if (!grading)
     return (
-      <Btn variant="outline" size="sm" onClick={() => setGrading(true)}>
-        <i className="fas fa-pen mr-1" />
-        Grade
+      <Btn variant={alreadyGraded ? "outline" : "primary"} size="sm" onClick={() => setGrading(true)}>
+        <i className={`fas ${alreadyGraded ? "fa-edit" : "fa-pen"} mr-1`} />
+        {alreadyGraded ? "Edit" : "Grade"}
       </Btn>
     );
 
@@ -506,7 +602,8 @@ function GradeSubmissionBtn({
         onChange={(e) => setMarks(e.target.value)}
         className="w-14 border rounded py-0.5 px-1 text-[11px] font-mono"
         style={{ borderColor: "hsl(var(--border))" }}
-        placeholder="Marks"
+        placeholder={totalMarks ? `/${totalMarks}` : "Marks"}
+        max={totalMarks}
       />
       <input
         type="text"
@@ -520,7 +617,11 @@ function GradeSubmissionBtn({
         variant="primary"
         size="sm"
         onClick={async () => {
-          await supabase
+          if (totalMarks && Number(marks) > totalMarks) {
+            showToast(`Marks cannot exceed ${totalMarks}`, "error");
+            return;
+          }
+          const { error } = await supabase
             .from("submissions")
             .update({
               obtained_marks: marks ? Number(marks) : null,
@@ -528,12 +629,27 @@ function GradeSubmissionBtn({
               status: "graded",
             })
             .eq("id", submission.id);
-          showToast("Graded");
+          if (error) {
+            showToast(error.message, "error");
+            return;
+          }
+          showToast(alreadyGraded ? "Marks updated" : "Graded");
           setGrading(false);
           onDone();
         }}
       >
         ✓
+      </Btn>
+      <Btn
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          setGrading(false);
+          setMarks(submission.obtained_marks?.toString() || "");
+          setComment(submission.teacher_comment || "");
+        }}
+      >
+        ✕
       </Btn>
     </div>
   );
