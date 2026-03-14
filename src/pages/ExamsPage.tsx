@@ -384,11 +384,11 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
                       <td className="py-2.5 px-3.5">
                         {(isAdmin || isTeacher || isHOD) && (
                           <div className="flex gap-1">
-                            <Btn variant="outline" size="sm" onClick={() => setEditMarksModal(r)} title="Edit marks">
+                            <Btn variant="outline" size="sm" onClick={() => setEditMarksModal(r)}>
                               <i className="fas fa-pen mr-1" />
                               Marks
                             </Btn>
-                            <Btn variant="outline" size="sm" onClick={() => setCommentModal(r)} title="Edit comments">
+                            <Btn variant="outline" size="sm" onClick={() => setCommentModal(r)}>
                               <i className="fas fa-comment" />
                             </Btn>
                           </div>
