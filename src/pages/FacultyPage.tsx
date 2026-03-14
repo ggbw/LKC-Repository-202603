@@ -44,6 +44,7 @@ export default function FacultyPage() {
   const invalidate = useInvalidate();
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<string | "new" | null>(null);
+  const [accountModal, setAccountModal] = useState<any>(null);
 
   if (detail) {
     const t = teachers.find((x: any) => x.id === detail) as any;
@@ -62,15 +63,45 @@ export default function FacultyPage() {
             >
               👩‍🏫
             </div>
-            <div>
+            <div className="flex-1">
               <div className="text-xl font-bold">{t.name}</div>
-              <div className="flex gap-2 items-center mt-1.5">
+              <div className="flex gap-2 items-center mt-1.5 flex-wrap">
                 <Badge status={t.state || "active"} />
                 <span className="font-mono text-[11px]" style={{ color: "hsl(var(--text2))" }}>
                   {t.code}
                 </span>
+                {t.department && (
+                  <span
+                    className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+                    style={{ background: "#ddf4ff", color: "#0969da" }}
+                  >
+                    {t.department}
+                  </span>
+                )}
+                {t.user_id ? (
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                    style={{ background: "#dafbe1", color: "#1a7f37", border: "1px solid #aceebb" }}
+                  >
+                    <i className="fas fa-check-circle mr-1" />
+                    Has login account
+                  </span>
+                ) : (
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                    style={{ background: "#ffebe9", color: "#cf222e", border: "1px solid #ffcecb" }}
+                  >
+                    No login account
+                  </span>
+                )}
               </div>
             </div>
+            {isAdmin && !t.user_id && (
+              <Btn size="sm" onClick={() => setAccountModal(t)}>
+                <i className="fas fa-user-plus mr-1" />
+                Create Login
+              </Btn>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Card title="Details">
@@ -119,6 +150,7 @@ export default function FacultyPage() {
         Email: t.email || "",
         Phone: t.phone || "",
         Status: cap(t.state || "active"),
+        "Has Account": t.user_id ? "Yes" : "No",
       })),
       "teachers_export",
       "Teachers",
@@ -135,10 +167,11 @@ export default function FacultyPage() {
       for (const row of data) {
         const name = row["Name"] || row["name"];
         if (!name) continue;
+        const dept = row["Department"] || row["department"] || null;
         const { error } = await supabase.from("teachers").insert({
           name,
           code: row["Code"] || row["code"] || null,
-          department: row["Department"] || row["department"] || null,
+          department: dept || null,
           email: row["Email"] || row["email"] || null,
           phone: row["Phone"] || row["phone"] || null,
         });
@@ -187,15 +220,17 @@ export default function FacultyPage() {
           <table className="w-full border-collapse text-[12.5px]">
             <thead>
               <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
-                {["Code", "Name", "Department", "Email", "Status", ...(isAdmin ? ["Actions"] : [])].map((h) => (
-                  <th
-                    key={h}
-                    className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide"
-                    style={{ color: "hsl(var(--text2))" }}
-                  >
-                    {h}
-                  </th>
-                ))}
+                {["Code", "Name", "Department", "Email", "Account", "Status", ...(isAdmin ? ["Actions"] : [])].map(
+                  (h) => (
+                    <th
+                      key={h}
+                      className="py-[9px] px-3.5 text-left text-[10px] font-semibold uppercase tracking-wide"
+                      style={{ color: "hsl(var(--text2))" }}
+                    >
+                      {h}
+                    </th>
+                  ),
+                )}
               </tr>
             </thead>
             <tbody>
@@ -210,8 +245,28 @@ export default function FacultyPage() {
                     {t.code}
                   </td>
                   <td className="py-2.5 px-3.5 font-semibold">{t.name}</td>
-                  <td className="py-2.5 px-3.5 text-[11px]">{t.department}</td>
+                  <td className="py-2.5 px-3.5 text-[11px]">
+                    {t.department || <span style={{ color: "hsl(var(--text3))" }}>—</span>}
+                  </td>
                   <td className="py-2.5 px-3.5 text-[11px]">{t.email || "—"}</td>
+                  <td className="py-2.5 px-3.5">
+                    {t.user_id ? (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                        style={{ background: "#dafbe1", color: "#1a7f37" }}
+                      >
+                        <i className="fas fa-check mr-0.5" />
+                        Active
+                      </span>
+                    ) : (
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
+                        style={{ background: "#ffebe9", color: "#cf222e" }}
+                      >
+                        None
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2.5 px-3.5">
                     <Badge status={t.state || "active"} />
                   </td>
@@ -228,6 +283,17 @@ export default function FacultyPage() {
                         >
                           ✏️
                         </Btn>
+                        {!t.user_id && (
+                          <Btn
+                            size="sm"
+                            onClick={(e: any) => {
+                              e.stopPropagation();
+                              setAccountModal(t);
+                            }}
+                          >
+                            <i className="fas fa-user-plus" />
+                          </Btn>
+                        )}
                         <Btn
                           variant="danger"
                           size="sm"
@@ -260,7 +326,92 @@ export default function FacultyPage() {
           }}
         />
       )}
+      {accountModal && (
+        <CreateTeacherAccountModal
+          teacher={accountModal}
+          onClose={() => {
+            setAccountModal(null);
+            invalidate(["teachers"]);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Create Login for existing teacher ── */
+function CreateTeacherAccountModal({ teacher, onClose }: { teacher: any; onClose: () => void }) {
+  const { showToast } = useApp();
+  const [email, setEmail] = useState(teacher.email || "");
+  const [saving, setSaving] = useState(false);
+  const [created, setCreated] = useState<{ password: string } | null>(null);
+
+  const save = async () => {
+    if (!email.trim()) {
+      showToast("Email is required", "error");
+      return;
+    }
+    setSaving(true);
+    const password = (teacher.name.split(" ")[0]?.toLowerCase() || "user") + Math.floor(1000 + Math.random() * 9000);
+    const { data, error } = await supabase.functions.invoke("create-user", {
+      body: { email, password, full_name: teacher.name, role: "teacher", link_table: "teachers", link_id: teacher.id },
+    });
+    if (error || data?.error) {
+      showToast(data?.error || error?.message || "Failed", "error");
+      setSaving(false);
+      return;
+    }
+    // Update teacher email if it changed
+    if (email !== teacher.email) await supabase.from("teachers").update({ email }).eq("id", teacher.id);
+    setCreated({ password });
+    showToast(`Login created for ${teacher.name}`);
+  };
+
+  return (
+    <Modal onClose={onClose} size="sm">
+      <ModalHead title={`Create Login — ${teacher.name}`} onClose={onClose} />
+      <ModalBody>
+        {!created ? (
+          <>
+            <Field label="Email address (login username)" required>
+              <FieldInput value={email} onChange={setEmail} type="email" />
+            </Field>
+            <div
+              className="rounded-md px-3 py-2 text-[11px]"
+              style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}
+            >
+              <i className="fas fa-info-circle mr-1" />A password will be auto-generated. Share it with the teacher
+              securely.
+            </div>
+          </>
+        ) : (
+          <div className="rounded-md px-4 py-3" style={{ background: "#dafbe1", border: "1px solid #aceebb" }}>
+            <div className="font-semibold text-[12.5px] mb-1" style={{ color: "#1a7f37" }}>
+              ✓ Account created!
+            </div>
+            <div className="text-[11px]" style={{ color: "#2ea043" }}>
+              Email: <strong>{email}</strong>
+            </div>
+            <div className="text-[11px]" style={{ color: "#2ea043" }}>
+              Password: <strong className="font-mono">{created.password}</strong>
+            </div>
+            <div className="text-[10px] mt-1" style={{ color: "#2ea043" }}>
+              Teacher must change password on first login.
+            </div>
+          </div>
+        )}
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          {created ? "Close" : "Cancel"}
+        </Btn>
+        {!created && (
+          <Btn onClick={save} disabled={saving}>
+            {saving ? "Creating…" : "Create Login"}
+          </Btn>
+        )}
+      </ModalFoot>
+    </Modal>
   );
 }
 
@@ -270,22 +421,7 @@ function TeacherModal({ id, teachers, onClose }: { id: string | null; teachers: 
   const [name, setName] = useState(existing?.name || "");
   const [code, setCode] = useState(existing?.code || "");
   const [dept, setDept] = useState(existing?.department || "");
-  const deptIsCustom =
-    dept !== "" &&
-    ![
-      "Administration",
-      "Science",
-      "Mathematics",
-      "Languages",
-      "Humanities",
-      "ICT",
-      "Arts",
-      "Physical Education",
-      "Finance",
-      "Maintenance",
-      "Library",
-      "Other",
-    ].includes(dept);
+  const deptIsCustom = dept !== "" && !DEPARTMENTS.includes(dept);
   const [email, setEmail] = useState(existing?.email || "");
   const [phone, setPhone] = useState(existing?.phone || "");
   const [saving, setSaving] = useState(false);
@@ -302,6 +438,11 @@ function TeacherModal({ id, teachers, onClose }: { id: string | null; teachers: 
         showToast(error.message, "error");
         setSaving(false);
         return;
+      }
+      // Sync email back to profile if linked
+      const t = teachers.find((x: any) => x.id === id);
+      if (t?.user_id && email && email !== t.email) {
+        await supabase.from("profiles").update({ email }).eq("user_id", t.user_id);
       }
       showToast("Teacher updated");
     } else {
