@@ -23,6 +23,7 @@ import ConfigPage from "@/pages/ConfigPage";
 import UserManagementPage from "@/pages/UserManagementPage";
 import ProfilePage from "@/pages/ProfilePage";
 import RequisitionsPage from "@/pages/RequisitionsPage";
+import AdminAdmissionsPage from "@/pages/AdminAdmissionsPage";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +71,7 @@ function AppInner() {
     users: <UserManagementPage />,
     profile: <ProfilePage />,
     requisitions: <RequisitionsPage />,
+    admission: <AdminAdmissionsPage />,
   };
 
   return (
