@@ -55,8 +55,6 @@ export default function UserManagementPage() {
   const { data: teachers = [], isLoading: tLoading } = useTeachers();
   const { data: students = [], isLoading: sLoading } = useStudents();
   const { data: parents = [], isLoading: prLoading } = useParents();
-  const { data: departmentsData = [] } = useDepartments();
-  const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const invalidate = useInvalidate();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -592,6 +590,8 @@ export default function UserManagementPage() {
 /* ── Edit User Modal ── */
 function EditUserModal({ user, onClose }: { user: UnifiedUser; onClose: () => void }) {
   const { showToast } = useApp();
+  const { data: departmentsData = [] } = useDepartments();
+  const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email || "");
   const [dept, setDept] = useState(user.department || "");
@@ -1175,6 +1175,8 @@ function CreateUserModal({
   onClose: (created?: { email: string; password: string; name: string; role: string }) => void;
 }) {
   const { showToast } = useApp();
+  const { data: departmentsData = [] } = useDepartments();
+  const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const { data: teachers = [] } = useTeachers();
   const { data: students = [] } = useStudents();
   const { data: parents = [] } = useParents();
