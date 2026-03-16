@@ -101,12 +101,30 @@ export default function UserManagementPage() {
     });
 
     teachers.forEach((t: any) => {
-      if (t.user_id && userMap.has(t.user_id)) {
-        const e = userMap.get(t.user_id)!;
-        e.source.push("teacher");
-        e.department = t.department;
-        e.linkTable = "teachers";
-        e.linkId = t.id;
+      if (t.user_id) {
+        if (userMap.has(t.user_id)) {
+          const e = userMap.get(t.user_id)!;
+          e.source.push("teacher");
+          e.department = t.department;
+          e.linkTable = "teachers";
+          e.linkId = t.id;
+        } else {
+          userMap.set(t.user_id, {
+            id: t.user_id,
+            name: t.name,
+            email: t.email,
+            roles: getRoles(t.user_id),
+            hasAccount: true,
+            mustChangePassword: false,
+            userId: t.user_id,
+            profileId: null,
+            source: ["teacher"],
+            createdAt: t.created_at,
+            department: t.department,
+            linkTable: "teachers",
+            linkId: t.id,
+          });
+        }
       } else {
         userMap.set(`teacher-${t.id}`, {
           id: `teacher-${t.id}`,
@@ -127,15 +145,38 @@ export default function UserManagementPage() {
     });
 
     students.forEach((s: any) => {
-      if (s.user_id && userMap.has(s.user_id)) {
-        const e = userMap.get(s.user_id)!;
-        e.source.push("student");
-        e.form = s.form;
-        if (!e.linkTable) {
-          e.linkTable = "students";
-          e.linkId = s.id;
+      if (s.user_id) {
+        // Student has a linked auth account
+        if (userMap.has(s.user_id)) {
+          // Profile already loaded — merge into it
+          const e = userMap.get(s.user_id)!;
+          e.source.push("student");
+          e.form = s.form;
+          if (!e.linkTable) {
+            e.linkTable = "students";
+            e.linkId = s.id;
+          }
+        } else {
+          // Profile not yet loaded (race condition after account creation)
+          // Key by user_id so it won't duplicate once profiles reload
+          userMap.set(s.user_id, {
+            id: s.user_id,
+            name: s.full_name,
+            email: s.email,
+            roles: getRoles(s.user_id),
+            hasAccount: true,
+            mustChangePassword: false,
+            userId: s.user_id,
+            profileId: null,
+            source: ["student"],
+            createdAt: s.created_at,
+            form: s.form,
+            linkTable: "students",
+            linkId: s.id,
+          });
         }
       } else {
+        // No account — show as unlinked entry
         userMap.set(`student-${s.id}`, {
           id: `student-${s.id}`,
           name: s.full_name,
@@ -155,8 +196,30 @@ export default function UserManagementPage() {
     });
 
     parents.forEach((pr: any) => {
-      if (pr.user_id && userMap.has(pr.user_id)) {
-        userMap.get(pr.user_id)!.source.push("parent");
+      if (pr.user_id) {
+        if (userMap.has(pr.user_id)) {
+          const e = userMap.get(pr.user_id)!;
+          e.source.push("parent");
+          if (!e.linkTable) {
+            e.linkTable = "parents";
+            e.linkId = pr.id;
+          }
+        } else {
+          userMap.set(pr.user_id, {
+            id: pr.user_id,
+            name: pr.name,
+            email: pr.email,
+            roles: getRoles(pr.user_id),
+            hasAccount: true,
+            mustChangePassword: false,
+            userId: pr.user_id,
+            profileId: null,
+            source: ["parent"],
+            createdAt: pr.created_at,
+            linkTable: "parents",
+            linkId: pr.id,
+          });
+        }
       } else {
         userMap.set(`parent-${pr.id}`, {
           id: `parent-${pr.id}`,
