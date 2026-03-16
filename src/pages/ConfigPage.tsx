@@ -15,6 +15,7 @@ import {
   useClasses,
   useProfiles,
   useReqRoleMappings,
+  useDepartments,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
