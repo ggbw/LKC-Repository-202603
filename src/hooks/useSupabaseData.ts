@@ -143,6 +143,17 @@ export function useAdmissionEnquiries() {
   });
 }
 
+export function useDepartments() {
+  return useQuery({
+    queryKey: ["departments"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("departments").select("*").order("sort_order").order("name");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}
+
 export function useSubjectTeachers() {
   return useQuery({
     queryKey: ["subject_teachers"],
