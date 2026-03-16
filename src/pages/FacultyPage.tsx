@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { useAuth } from "@/context/AuthContext";
-import { useTeachers, useSubjectTeachers, useInvalidate } from "@/hooks/useSupabaseData";
+import { useTeachers, useSubjectTeachers, useDepartments, useInvalidate } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
 import { cap } from "@/data/database";
 import { downloadExcel, parseExcel, triggerFileUpload } from "@/lib/excel";
@@ -21,26 +21,15 @@ import {
   FieldSelect,
 } from "@/components/SharedUI";
 
-const DEPARTMENTS = [
-  "Administration",
-  "Science",
-  "Mathematics",
-  "Languages",
-  "Humanities",
-  "ICT",
-  "Arts",
-  "Physical Education",
-  "Finance",
-  "Maintenance",
-  "Library",
-  "Other",
-];
+// Departments loaded from DB via useDepartments hook
 
 export default function FacultyPage() {
   const { detail, setDetail, showToast } = useApp();
   const { isAdmin } = useAuth();
   const { data: teachers = [], isLoading } = useTeachers();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
+  const { data: departmentsData = [] } = useDepartments();
+  const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const invalidate = useInvalidate();
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<string | "new" | null>(null);
