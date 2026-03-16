@@ -245,6 +245,13 @@ function GeneralTab({
   const [editClass, setEditClass] = useState<any>(null);
   const [savingClass, setSavingClass] = useState(false);
 
+  // ── Departments state ──
+  const { data: departments = [] } = useDepartments();
+  const [newDeptName, setNewDeptName] = useState("");
+  const [newDeptDesc, setNewDeptDesc] = useState("");
+  const [editDept, setEditDept] = useState<any>(null);
+  const [savingDept, setSavingDept] = useState(false);
+
   // ── User Roles state ──
   const [userRoleModal, setUserRoleModal] = useState<
     false | { id: string; user_id: string; role: string; name: string }
@@ -448,6 +455,51 @@ function GeneralTab({
     } else {
       showToast(`Form "${name}" deleted`);
       invalidate(["forms"]);
+    }
+  };
+
+  // ── Department actions ──
+  const addDept = async () => {
+    if (!newDeptName.trim()) return;
+    setSavingDept(true);
+    const maxOrder = departments.length > 0 ? Math.max(...departments.map((d: any) => d.sort_order ?? 0)) + 1 : 1;
+    const { error } = await (supabase as any)
+      .from("departments")
+      .insert({ name: newDeptName.trim(), description: newDeptDesc.trim() || null, sort_order: maxOrder });
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Department "${newDeptName}" added`);
+      invalidate(["departments"]);
+      setNewDeptName("");
+      setNewDeptDesc("");
+    }
+    setSavingDept(false);
+  };
+  const updateDept = async () => {
+    if (!editDept) return;
+    setSavingDept(true);
+    const { error } = await (supabase as any)
+      .from("departments")
+      .update({ name: editDept.name, description: editDept.description || null })
+      .eq("id", editDept.id);
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast("Department updated");
+      invalidate(["departments"]);
+      setEditDept(null);
+    }
+    setSavingDept(false);
+  };
+  const deleteDept = async (id: string, name: string) => {
+    if (!confirm(`Delete department "${name}"? Teachers assigned to this department will not be affected.`)) return;
+    const { error } = await (supabase as any).from("departments").delete().eq("id", id);
+    if (error) {
+      showToast(error.message, "error");
+    } else {
+      showToast(`Department "${name}" deleted`);
+      invalidate(["departments"]);
     }
   };
 
@@ -1042,6 +1094,128 @@ function GeneralTab({
               })}
             </tbody>
           </table>
+        )}
+      </Card>
+
+      {/* ══ Departments ══ */}
+      <Card
+        title={
+          <>
+            <i className="fas fa-building mr-1.5" />
+            Departments ({departments.length})
+          </>
+        }
+      >
+        <table className="w-full border-collapse text-[12.5px] mb-3">
+          <thead>
+            <tr style={{ background: "hsl(var(--surface2))", borderBottom: "2px solid hsl(var(--border))" }}>
+              {["Name", "Description", ...(isAdmin ? ["Actions"] : [])].map((h) => (
+                <th
+                  key={h}
+                  className="py-2 px-3 text-left text-[10px] font-semibold uppercase"
+                  style={{ color: "hsl(var(--text2))" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {departments.length === 0 && (
+              <tr>
+                <td colSpan={3} className="py-4 text-center text-xs" style={{ color: "hsl(var(--text3))" }}>
+                  No departments yet
+                </td>
+              </tr>
+            )}
+            {departments.map((d: any) => (
+              <tr key={d.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
+                {editDept?.id === d.id ? (
+                  <>
+                    <td className="py-1.5 px-3">
+                      <input
+                        className="border rounded px-2 py-1 text-[12px] w-full"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        value={editDept.name}
+                        onChange={(e) => setEditDept({ ...editDept, name: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <input
+                        className="border rounded px-2 py-1 text-[12px] w-full"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                        placeholder="Optional description"
+                        value={editDept.description || ""}
+                        onChange={(e) => setEditDept({ ...editDept, description: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-1.5 px-3">
+                      <div className="flex gap-1">
+                        <Btn size="sm" onClick={updateDept} disabled={savingDept}>
+                          {savingDept ? "…" : "Save"}
+                        </Btn>
+                        <Btn variant="outline" size="sm" onClick={() => setEditDept(null)}>
+                          Cancel
+                        </Btn>
+                      </div>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="py-2 px-3 font-semibold">{d.name}</td>
+                    <td className="py-2 px-3 text-[11px]" style={{ color: "hsl(var(--text2))" }}>
+                      {d.description || "—"}
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2 px-3">
+                        <div className="flex gap-1">
+                          <Btn variant="outline" size="sm" onClick={() => setEditDept({ ...d })}>
+                            <i className="fas fa-edit" />
+                          </Btn>
+                          <Btn variant="danger" size="sm" onClick={() => deleteDept(d.id, d.name)}>
+                            <i className="fas fa-trash" />
+                          </Btn>
+                        </div>
+                      </td>
+                    )}
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {isAdmin && (
+          <div className="flex gap-2 items-end pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Department Name
+              </div>
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                placeholder="e.g. Science"
+                value={newDeptName}
+                onChange={(e) => setNewDeptName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addDept()}
+              />
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] font-semibold mb-1" style={{ color: "hsl(var(--text2))" }}>
+                Description (optional)
+              </div>
+              <input
+                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
+                style={{ borderColor: "hsl(var(--border))" }}
+                placeholder="Brief description"
+                value={newDeptDesc}
+                onChange={(e) => setNewDeptDesc(e.target.value)}
+              />
+            </div>
+            <Btn onClick={addDept} disabled={savingDept || !newDeptName.trim()}>
+              <i className="fas fa-plus mr-1" />
+              {savingDept ? "Adding…" : "Add Department"}
+            </Btn>
+          </div>
         )}
       </Card>
 
