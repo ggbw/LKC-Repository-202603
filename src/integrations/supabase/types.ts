@@ -48,6 +48,7 @@ export type Database = {
           parent_name: string
           parent_phone: string | null
           previous_school: string | null
+          rejection_reason: string | null
           status: string | null
           student_name: string
         }
@@ -63,6 +64,7 @@ export type Database = {
           parent_name: string
           parent_phone?: string | null
           previous_school?: string | null
+          rejection_reason?: string | null
           status?: string | null
           student_name: string
         }
@@ -78,6 +80,7 @@ export type Database = {
           parent_name?: string
           parent_phone?: string | null
           previous_school?: string | null
+          rejection_reason?: string | null
           status?: string | null
           student_name?: string
         }
