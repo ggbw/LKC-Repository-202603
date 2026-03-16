@@ -406,6 +406,8 @@ function CreateTeacherAccountModal({ teacher, onClose }: { teacher: any; onClose
 
 function TeacherModal({ id, teachers, onClose }: { id: string | null; teachers: any[]; onClose: () => void }) {
   const { showToast } = useApp();
+  const { data: departmentsData = [] } = useDepartments();
+  const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const existing = id ? teachers.find((t: any) => t.id === id) : null;
   const [name, setName] = useState(existing?.name || "");
   const [code, setCode] = useState(existing?.code || "");
