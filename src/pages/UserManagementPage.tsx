@@ -7,6 +7,7 @@ import {
   useTeachers,
   useStudents,
   useParents,
+  useDepartments,
   useInvalidate,
 } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,20 +26,7 @@ import {
   FieldSelect,
 } from "@/components/SharedUI";
 
-const DEPARTMENTS = [
-  "Administration",
-  "Science",
-  "Mathematics",
-  "Languages",
-  "Humanities",
-  "ICT",
-  "Arts",
-  "Physical Education",
-  "Finance",
-  "Maintenance",
-  "Library",
-  "Other",
-];
+// Departments loaded from DB via useDepartments hook
 
 type RoleFilter = "all" | "admin" | "teacher" | "student" | "parent" | "no-account";
 
@@ -67,6 +55,8 @@ export default function UserManagementPage() {
   const { data: teachers = [], isLoading: tLoading } = useTeachers();
   const { data: students = [], isLoading: sLoading } = useStudents();
   const { data: parents = [], isLoading: prLoading } = useParents();
+  const { data: departmentsData = [] } = useDepartments();
+  const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const invalidate = useInvalidate();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
