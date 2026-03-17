@@ -4,6 +4,7 @@ import { Card, FilterSelect, GradeChip, Btn } from "@/components/SharedUI";
 import { FORMS, GRADES, G, P } from "@/data/database";
 import { downloadExcel } from "@/lib/excel";
 import { useApp } from "@/context/AppContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface StudentRow {
   name: string;
@@ -17,6 +18,19 @@ interface StudentRow {
 }
 
 export default function HOYReportPage() {
+  const { isAdmin, isHOY } = useAuth();
+
+  if (!isAdmin && !isHOY) {
+    return (
+      <div className="page-animate">
+        <div className="text-sm" style={{ color: "hsl(var(--text2))" }}>
+          <i className="fas fa-lock mr-2" />
+          Access restricted to HOY and administrators.
+        </div>
+      </div>
+    );
+  }
+
   const { data: results = [] } = useExamResults();
   const { data: students = [] } = useStudents();
   const { data: subjects = [] } = useSubjects();
