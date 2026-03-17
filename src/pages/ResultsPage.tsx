@@ -5,6 +5,7 @@ import {
   useTeachers,
   useSubjectTeachers,
   useClassTeachers,
+  useParentStudents,
 } from "@/hooks/useSupabaseData";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
@@ -14,7 +15,7 @@ import { downloadExcel } from "@/lib/excel";
 import { Badge, Card, StatCard, SearchBar, FilterSelect, GradeChip, Btn } from "@/components/SharedUI";
 
 export default function ResultsPage() {
-  const { isAdmin, isHOD, isHOY, isTeacher, isStudent, isClassTeacher, user } = useAuth();
+  const { isAdmin, isHOD, isHOY, isTeacher, isStudent, isParent, isClassTeacher, user } = useAuth();
   const { showToast } = useApp();
 
   const { data: results = [], isLoading } = useExamResults();
@@ -22,6 +23,7 @@ export default function ResultsPage() {
   const { data: teachers = [] } = useTeachers();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: classTeachers = [] } = useClassTeachers();
+  const { data: parentStudents = [] } = useParentStudents();
 
   const [search, setSearch] = useState("");
   const [examFilter, setExamFilter] = useState("");
@@ -32,6 +34,18 @@ export default function ResultsPage() {
   const myTeacher = useMemo(() => teachers.find((t: any) => t.user_id === user?.id), [teachers, user]);
 
   const myStudent = useMemo(() => students.find((s: any) => s.user_id === user?.id), [students, user]);
+
+  // Parent: find their record and their children's student IDs
+  const myParentRecord = useMemo(
+    () => parentStudents.find((ps: any) => ps.parents?.user_id === user?.id)?.parents ?? null,
+    [parentStudents, user],
+  );
+  const myChildIds = useMemo(() => {
+    if (!myParentRecord) return new Set<string>();
+    return new Set(
+      parentStudents.filter((ps: any) => ps.parent_id === myParentRecord.id).map((ps: any) => ps.student_id),
+    );
+  }, [parentStudents, myParentRecord]);
 
   // Subject IDs this teacher teaches
   const mySubjectIds = useMemo(
@@ -82,6 +96,11 @@ export default function ResultsPage() {
       return results.filter((r: any) => r.student_id === myStudent.id);
     }
 
+    // Parent — see results for all their linked children
+    if (isParent && myChildIds.size > 0) {
+      return results.filter((r: any) => myChildIds.has(r.student_id));
+    }
+
     return [];
   }, [
     results,
@@ -91,10 +110,12 @@ export default function ResultsPage() {
     isClassTeacher,
     isTeacher,
     isStudent,
+    isParent,
     myTeacher,
     myStudent,
     mySubjectIds,
     myClassStudentIds,
+    myChildIds,
   ]);
 
   // ── Available filter options derived from role-filtered results ────────────
@@ -148,6 +169,7 @@ export default function ResultsPage() {
     }
     if (isTeacher) return "Your subjects only";
     if (isStudent) return "Your results only";
+    if (isParent) return "Your children's results";
     return "";
   }, [isAdmin, isHOD, isHOY, isClassTeacher, isTeacher, isStudent, myClassAssignments]);
 
