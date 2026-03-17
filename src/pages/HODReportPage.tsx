@@ -2,8 +2,22 @@ import React, { useState, useMemo } from "react";
 import { useExamResults, useTeachers, useSubjects, useSubjectTeachers, useExams } from "@/hooks/useSupabaseData";
 import { Card, Btn, FilterSelect } from "@/components/SharedUI";
 import { FORMS, GRADES, G, P } from "@/data/database";
+import { useAuth } from "@/context/AuthContext";
 
 export default function HODReportPage() {
+  const { isAdmin, isHOD } = useAuth();
+
+  if (!isAdmin && !isHOD) {
+    return (
+      <div className="page-animate">
+        <div className="text-sm" style={{ color: "hsl(var(--text2))" }}>
+          <i className="fas fa-lock mr-2" />
+          Access restricted to HOD and administrators.
+        </div>
+      </div>
+    );
+  }
+
   const { data: results = [] } = useExamResults();
   const { data: teachers = [] } = useTeachers();
   const { data: subjects = [] } = useSubjects();
