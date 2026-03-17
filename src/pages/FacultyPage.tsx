@@ -21,15 +21,11 @@ import {
   FieldSelect,
 } from "@/components/SharedUI";
 
-// Departments loaded from DB via useDepartments hook
-
 export default function FacultyPage() {
   const { detail, setDetail, showToast } = useApp();
   const { isAdmin } = useAuth();
   const { data: teachers = [], isLoading } = useTeachers();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
-  const { data: departmentsData = [] } = useDepartments();
-  const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const invalidate = useInvalidate();
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<string | "new" | null>(null);
