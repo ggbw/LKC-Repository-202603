@@ -784,6 +784,7 @@ function ResultModal({
 }) {
   const { showToast } = useApp();
   const { user, isAdmin, isHOD } = useAuth();
+  const { data: existingResults = [] } = useExamResults(examName);
   const [subjectId, setSubjectId] = useState("");
   const [filterForm, setFilterForm] = useState(examForm !== "All Forms" ? examForm : "Form 1");
   const [filterClass, setFilterClass] = useState(examClass || "");
@@ -845,7 +846,17 @@ function ResultModal({
   // Clear marks when student list changes
   const handleSubjectChange = (val: string) => {
     setSubjectId(val);
-    setMarks({});
+    // Pre-populate with existing results for this subject so teacher sees what's already entered
+    const existing: Record<string, string> = {};
+    existingResults
+      .filter((r: any) => r.subject_id === val)
+      .forEach((r: any) => {
+        existing[r.student_id] = String(r.obtained_marks);
+      });
+    setMarks(existing);
+    // Also set maxMarks from existing if available
+    const first = existingResults.find((r: any) => r.subject_id === val);
+    if (first) setMaxMarks(String(first.max_marks));
   };
 
   const save = async () => {
@@ -867,11 +878,27 @@ function ResultModal({
       setSaving(false);
       return;
     }
-    const { error } = await supabase.from("exam_results").insert(records);
+    // Upsert: update existing rows, insert new ones — prevents duplicates
+    const { error } = await supabase.from("exam_results").upsert(records, {
+      onConflict: "student_id,subject_id,exam_name",
+      ignoreDuplicates: false,
+    });
     if (error) {
-      showToast(error.message, "error");
-      setSaving(false);
-      return;
+      // Fallback: if no unique constraint yet, try insert with individual upsert logic
+      // Delete existing then insert (safe path until migration adds UNIQUE constraint)
+      const studentIds = records.map((r) => r.student_id);
+      await supabase
+        .from("exam_results")
+        .delete()
+        .eq("exam_name", examName)
+        .eq("subject_id", subjectId)
+        .in("student_id", studentIds);
+      const { error: insertErr } = await supabase.from("exam_results").insert(records);
+      if (insertErr) {
+        showToast(insertErr.message, "error");
+        setSaving(false);
+        return;
+      }
     }
     showToast(`${records.length} results saved`);
     onClose();
