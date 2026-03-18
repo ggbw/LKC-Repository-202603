@@ -42,7 +42,7 @@ export default function AssignmentsPage() {
   const { data: students = [] } = useStudents();
   const { data: studentSubjects = [] } = useStudentSubjects();
   const invalidate = useInvalidate();
-  const [modal, setModal] = useState(false);
+  const [modal, setModal] = useState<string | "new" | false>(false);
   const myTeacher = teachers.find((t: any) => t.user_id === user?.id);
   const myStudent = students.find((s: any) => s.user_id === user?.id);
 
@@ -114,7 +114,7 @@ export default function AssignmentsPage() {
             Export
           </Btn>
           {(isAdmin || isTeacher) && (
-            <Btn onClick={() => setModal(true)}>
+            <Btn onClick={() => setModal("new")}>
               <i className="fas fa-plus mr-1" />
               Create Assignment
             </Btn>
@@ -206,6 +206,18 @@ export default function AssignmentsPage() {
                     {(isAdmin || isTeacher) && (
                       <td className="py-2.5 px-3.5">
                         <div className="flex gap-1">
+                          {(a.teacher_id === myTeacher?.id || isAdmin) && (
+                            <Btn
+                              variant="outline"
+                              size="sm"
+                              onClick={(e: any) => {
+                                e.stopPropagation();
+                                setModal(a.id);
+                              }}
+                            >
+                              <i className="fas fa-edit" />
+                            </Btn>
+                          )}
                           {a.state === "draft" && (a.teacher_id === myTeacher?.id || isAdmin) && (
                             <Btn
                               variant="primary"
@@ -248,8 +260,10 @@ export default function AssignmentsPage() {
         </div>
       </Card>
 
-      {modal && (
+      {modal !== false && (
         <AssignmentModal
+          assignmentId={modal === "new" ? null : modal}
+          assignments={visibleAssignments}
           subjects={subjects}
           teachers={teachers}
           subjectTeachers={subjectTeachers}
@@ -927,11 +941,15 @@ function SubmitAssignmentModal({
 // ─── Create Assignment Modal ──────────────────────────────────────────────────
 
 function AssignmentModal({
+  assignmentId,
+  assignments,
   subjects,
   teachers,
   subjectTeachers,
   onClose,
 }: {
+  assignmentId: string | null;
+  assignments: any[];
   subjects: any[];
   teachers: any[];
   subjectTeachers: any[];
@@ -939,15 +957,16 @@ function AssignmentModal({
 }) {
   const { showToast } = useApp();
   const { user, isAdmin } = useAuth();
-  const [title, setTitle] = useState("");
-  const [form, setForm] = useState("Form 1");
-  const [className, setClassName] = useState("");
-  const [subjectId, setSubjectId] = useState("");
-  const [desc, setDesc] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [totalMarks, setTotalMarks] = useState("");
-  const [submissionType, setSubmissionType] = useState("file");
-  const [showOnReport, setShowOnReport] = useState(true);
+  const existing = assignmentId ? assignments.find((a: any) => a.id === assignmentId) : null;
+  const [title, setTitle] = useState(existing?.title || "");
+  const [form, setForm] = useState(existing?.form || "Form 1");
+  const [className, setClassName] = useState(existing?.class_name || "");
+  const [subjectId, setSubjectId] = useState(existing?.subject_id || "");
+  const [desc, setDesc] = useState(existing?.description || "");
+  const [dueDate, setDueDate] = useState(existing?.due_date ? existing.due_date.slice(0, 16) : "");
+  const [totalMarks, setTotalMarks] = useState(existing?.total_marks?.toString() || "");
+  const [submissionType, setSubmissionType] = useState(existing?.submission_type || "file");
+  const [showOnReport, setShowOnReport] = useState(existing?.show_on_report_card ?? true);
   const [saving, setSaving] = useState(false);
 
   // File upload state
@@ -1035,7 +1054,7 @@ function AssignmentModal({
       setUploading(false);
     }
 
-    const { error } = await supabase.from("assignments").insert({
+    const payload = {
       title,
       form,
       class_name: className || null,
@@ -1043,20 +1062,34 @@ function AssignmentModal({
       description: desc,
       due_date: dueDate || null,
       total_marks: totalMarks ? Number(totalMarks) : null,
-      teacher_id: myTeacher?.id || teachers[0]?.id,
-      state: "draft",
       submission_type: submissionType,
       show_on_report_card: showOnReport,
-      attachment_url: attachmentUrl,
-      attachment_name: attachmentName,
-    });
+      ...(attachmentUrl ? { attachment_url: attachmentUrl, attachment_name: attachmentName } : {}),
+    };
 
-    if (error) {
-      showToast(error.message, "error");
-      setSaving(false);
-      return;
+    if (existing) {
+      // Edit existing
+      const { error } = await supabase.from("assignments").update(payload).eq("id", existing.id);
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
+      showToast("Assignment updated");
+    } else {
+      // Create new
+      const { error } = await supabase.from("assignments").insert({
+        ...payload,
+        teacher_id: myTeacher?.id || teachers[0]?.id,
+        state: "draft",
+      });
+      if (error) {
+        showToast(error.message, "error");
+        setSaving(false);
+        return;
+      }
+      showToast("Assignment created as draft. Publish when ready.");
     }
-    showToast("Assignment created as draft. Publish when ready.");
     onClose();
   };
 
@@ -1065,7 +1098,7 @@ function AssignmentModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title="Create Assignment" onClose={onClose} />
+      <ModalHead title={existing ? "Edit Assignment" : "Create Assignment"} onClose={onClose} />
       <ModalBody>
         <Field label="Title" required>
           <FieldInput value={title} onChange={setTitle} placeholder="e.g. Chapter 3 Exercise" />
@@ -1273,6 +1306,8 @@ function AssignmentModal({
             </>
           ) : saving ? (
             "Saving…"
+          ) : existing ? (
+            "Save Changes"
           ) : (
             "Create Draft"
           )}
