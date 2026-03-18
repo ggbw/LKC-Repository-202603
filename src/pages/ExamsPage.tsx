@@ -34,7 +34,7 @@ import {
 
 export default function ExamsPage() {
   const { detail, setDetail, showToast } = useApp();
-  const { isAdmin, isHOD, isTeacher } = useAuth();
+  const { isAdmin, isHOD, isHOY, isTeacher } = useAuth();
   const { data: exams = [], isLoading } = useExams();
   const { data: results = [] } = useExamResults();
   const invalidate = useInvalidate();
