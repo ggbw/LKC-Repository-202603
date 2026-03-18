@@ -783,7 +783,7 @@ function ResultModal({
   onClose: () => void;
 }) {
   const { showToast } = useApp();
-  const { user, isAdmin, isHOD } = useAuth();
+  const { user, isAdmin, isHOD, isHOY } = useAuth();
   const { data: existingResults = [] } = useExamResults(examName);
   const [subjectId, setSubjectId] = useState("");
   const [filterForm, setFilterForm] = useState(examForm !== "All Forms" ? examForm : "Form 1");
