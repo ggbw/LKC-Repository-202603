@@ -30,6 +30,7 @@ export default function FacultyPage() {
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<string | "new" | null>(null);
   const [accountModal, setAccountModal] = useState<any>(null);
+  const [resetAccountModal, setResetAccountModal] = useState<any>(null);
 
   if (detail) {
     const t = teachers.find((x: any) => x.id === detail) as any;
@@ -81,12 +82,20 @@ export default function FacultyPage() {
                 )}
               </div>
             </div>
-            {isAdmin && !t.user_id && (
-              <Btn size="sm" onClick={() => setAccountModal(t)}>
-                <i className="fas fa-user-plus mr-1" />
-                Create Login
-              </Btn>
-            )}
+            <div className="flex gap-2">
+              {isAdmin && !t.user_id && (
+                <Btn size="sm" onClick={() => setAccountModal(t)}>
+                  <i className="fas fa-user-plus mr-1" />
+                  Create Login
+                </Btn>
+              )}
+              {isAdmin && t.user_id && (
+                <Btn variant="outline" size="sm" onClick={() => setResetAccountModal(t)}>
+                  <i className="fas fa-key mr-1" />
+                  Reset Password
+                </Btn>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Card title="Details">
@@ -279,6 +288,18 @@ export default function FacultyPage() {
                             <i className="fas fa-user-plus" />
                           </Btn>
                         )}
+                        {t.user_id && (
+                          <Btn
+                            variant="outline"
+                            size="sm"
+                            onClick={(e: any) => {
+                              e.stopPropagation();
+                              setResetAccountModal(t);
+                            }}
+                          >
+                            <i className="fas fa-key" />
+                          </Btn>
+                        )}
                         <Btn
                           variant="danger"
                           size="sm"
@@ -319,6 +340,9 @@ export default function FacultyPage() {
             invalidate(["teachers"]);
           }}
         />
+      )}
+      {resetAccountModal && (
+        <ResetTeacherPasswordModal teacher={resetAccountModal} onClose={() => setResetAccountModal(null)} />
       )}
     </div>
   );
@@ -393,6 +417,76 @@ function CreateTeacherAccountModal({ teacher, onClose }: { teacher: any; onClose
         {!created && (
           <Btn onClick={save} disabled={saving}>
             {saving ? "Creating…" : "Create Login"}
+          </Btn>
+        )}
+      </ModalFoot>
+    </Modal>
+  );
+}
+
+// ─── Reset Teacher Account Password ──────────────────────────────────────────
+function ResetTeacherPasswordModal({ teacher, onClose }: { teacher: any; onClose: () => void }) {
+  const { showToast } = useApp();
+  const [newPassword, setNewPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+
+  const save = async () => {
+    const pw =
+      newPassword.trim() ||
+      (teacher.name.split(" ")[0]?.toLowerCase() || "user") + Math.floor(1000 + Math.random() * 9000);
+    setSaving(true);
+    const { data, error } = await supabase.functions.invoke("create-user", {
+      body: { action: "reset_password", user_id: teacher.user_id, new_password: pw },
+    });
+    if (error || data?.error) {
+      showToast(data?.error || error?.message || "Failed", "error");
+      setSaving(false);
+      return;
+    }
+    setDone(pw);
+  };
+
+  return (
+    <Modal onClose={onClose} size="sm">
+      <ModalHead title={`Reset Password — ${teacher.name}`} onClose={onClose} />
+      <ModalBody>
+        {!done ? (
+          <>
+            <div className="text-[12px] mb-3" style={{ color: "hsl(var(--text2))" }}>
+              Reset the login password for <strong>{teacher.name}</strong> ({teacher.email}).
+            </div>
+            <Field label="New Password (leave blank to auto-generate)">
+              <FieldInput value={newPassword} onChange={setNewPassword} type="text" placeholder="Auto-generate" />
+            </Field>
+            <div
+              className="rounded-md px-3 py-2 text-[11px]"
+              style={{ background: "#fff8c5", border: "1px solid #ffe07c", color: "#9a6700" }}
+            >
+              ⚠ Teacher will be required to change password on next login.
+            </div>
+          </>
+        ) : (
+          <div className="rounded-lg px-4 py-3" style={{ background: "#dafbe1", border: "1px solid #aceebb" }}>
+            <div className="font-semibold text-[12.5px] mb-1" style={{ color: "#1a7f37" }}>
+              ✓ Password reset!
+            </div>
+            <div className="text-[11px]" style={{ color: "#2ea043" }}>
+              New password: <strong className="font-mono">{done}</strong>
+            </div>
+            <div className="text-[10px] mt-1" style={{ color: "#2ea043" }}>
+              Share this securely with the teacher.
+            </div>
+          </div>
+        )}
+      </ModalBody>
+      <ModalFoot>
+        <Btn variant="outline" onClick={onClose}>
+          {done ? "Close" : "Cancel"}
+        </Btn>
+        {!done && (
+          <Btn onClick={save} disabled={saving}>
+            {saving ? "Resetting…" : "Reset Password"}
           </Btn>
         )}
       </ModalFoot>
