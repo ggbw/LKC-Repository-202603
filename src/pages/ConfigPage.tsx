@@ -1841,7 +1841,10 @@ function SubjectTeacherModal({
     if (!subjectId || teacherIds.length === 0) return;
     setSaving(true);
     const records = teacherIds.map((tid) => ({ subject_id: subjectId, teacher_id: tid }));
-    const { error } = await supabase.from("subject_teachers").insert(records);
+    // Upsert: ignore already-existing subject-teacher pairs (UNIQUE subject_id,teacher_id)
+    const { error } = await supabase
+      .from("subject_teachers")
+      .upsert(records, { onConflict: "subject_id,teacher_id", ignoreDuplicates: true });
     if (error) {
       showToast(error.message, "error");
       setSaving(false);
@@ -2004,22 +2007,36 @@ function SubjectStudentModal({
 
   const save = async () => {
     if (!subjectId || selectedIds.length === 0) return;
+    // Use the selected teacher, or auto-pick if only one teacher teaches this subject
+    const effectiveTeacherId = selectedTeacherId || (matchedTeachers.length === 1 ? matchedTeachers[0].id : null);
     setSaving(true);
     const records = selectedIds.map((sid) => ({
       subject_id: subjectId,
       student_id: sid,
-      teacher_id: selectedTeacherId || null,
+      teacher_id: effectiveTeacherId || null,
     }));
+    // Upsert: skip already-mapped students (UNIQUE student_id,subject_id) instead of crashing
+    let successCount = 0;
+    let skipCount = 0;
     for (let i = 0; i < records.length; i += 50) {
       const batch = records.slice(i, i + 50);
-      const { error } = await supabase.from("student_subjects").insert(batch);
+      const { error, data } = await supabase
+        .from("student_subjects")
+        .upsert(batch, { onConflict: "student_id,subject_id", ignoreDuplicates: true })
+        .select();
       if (error) {
         showToast(error.message, "error");
         setSaving(false);
         return;
       }
+      successCount += data?.length ?? batch.length;
     }
-    showToast(`${records.length} student(s) mapped to subject`);
+    skipCount = records.length - successCount;
+    const msg =
+      skipCount > 0
+        ? `${successCount} mapped, ${skipCount} already existed (skipped)`
+        : `${successCount} student(s) mapped to subject`;
+    showToast(msg);
     onClose();
   };
 
@@ -2039,7 +2056,12 @@ function SubjectStudentModal({
             value={subjectId}
             onChange={(v) => {
               setSubjectId(v);
-              setSelectedTeacherId("");
+              // Auto-select teacher if only one teaches this subject
+              const tList = subjectTeachersAll
+                .filter((st: any) => st.subject_id === v)
+                .map((st: any) => st.teacher_id)
+                .filter(Boolean);
+              setSelectedTeacherId(tList.length === 1 ? tList[0] : "");
               setSelectedIds([]);
             }}
             options={[
