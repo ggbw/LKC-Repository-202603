@@ -65,6 +65,28 @@ export default function StudentsPage() {
     return classTeachers.filter((ct: any) => ct.teacher_id === myTeacher.id);
   }, [classTeachers, myTeacher]);
 
+  // For teacher view: which students are in class teacher classes
+  const classTeacherStudentIds = useMemo(() => {
+    if (!isTeacher || !myTeacher) return new Set<string>();
+    return new Set(
+      students
+        .filter((s: any) => myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name))
+        .map((s: any) => s.id),
+    );
+  }, [isTeacher, myTeacher, students, myClassAssignments]);
+
+  // Parent: find their record and linked children IDs
+  const myParentRecord = useMemo(
+    () => parentStudents.find((ps: any) => ps.parents?.user_id === user?.id)?.parents ?? null,
+    [parentStudents, user],
+  );
+  const myChildIds = useMemo(() => {
+    if (!myParentRecord) return new Set<string>();
+    return new Set(
+      parentStudents.filter((ps: any) => ps.parent_id === myParentRecord.id).map((ps: any) => ps.student_id as string),
+    );
+  }, [parentStudents, myParentRecord]);
+
   // All students visible to this user (union of class + subject students for teachers)
   const allVisibleStudents = useMemo(() => {
     if (isAdmin) return students;
@@ -132,28 +154,6 @@ export default function StudentsPage() {
     }
     return map;
   }, [isTeacher, myTeacher, studentSubjects, mySubjectIds, subjects]);
-
-  // For teacher view: which students are in class teacher classes
-  const classTeacherStudentIds = useMemo(() => {
-    if (!isTeacher || !myTeacher) return new Set<string>();
-    return new Set(
-      students
-        .filter((s: any) => myClassAssignments.some((ct: any) => ct.form === s.form && ct.class_name === s.class_name))
-        .map((s: any) => s.id),
-    );
-  }, [isTeacher, myTeacher, students, myClassAssignments]);
-
-  // Parent: find their record and linked children IDs
-  const myParentRecord = useMemo(
-    () => parentStudents.find((ps: any) => ps.parents?.user_id === user?.id)?.parents ?? null,
-    [parentStudents, user],
-  );
-  const myChildIds = useMemo(() => {
-    if (!myParentRecord) return new Set<string>();
-    return new Set(
-      parentStudents.filter((ps: any) => ps.parent_id === myParentRecord.id).map((ps: any) => ps.student_id as string),
-    );
-  }, [parentStudents, myParentRecord]);
 
   if (detail) return <StudentDetail id={detail} onBack={() => setDetail(null)} />;
 
