@@ -207,7 +207,7 @@ export default function ExamsPage() {
 
 function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { showToast } = useApp();
-  const { isAdmin, isHOD, isTeacher, user } = useAuth();
+  const { isAdmin, isHOD, isHOY, isTeacher, user } = useAuth();
   const { data: exams = [] } = useExams();
   const { data: subjects = [] } = useSubjects();
   const { data: students = [] } = useStudents();
@@ -238,7 +238,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   const filtResults = results.filter((r: any) => {
     if (filterSubject && r.subject_id !== filterSubject) return false;
-    if (isTeacher && !isAdmin && !isHOD && mySubjectIds.length > 0 && !mySubjectIds.includes(r.subject_id))
+    if (isTeacher && !isAdmin && !isHOD && !isHOY && mySubjectIds.length > 0 && !mySubjectIds.includes(r.subject_id))
       return false;
     return true;
   });
@@ -331,7 +331,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
               <i className="fas fa-download mr-1" />
               Export
             </Btn>
-            {(isAdmin || isHOD || isTeacher) && (
+            {(isAdmin || isHOD || isHOY || isTeacher) && (
               <Btn size="sm" onClick={() => setResultModal(true)}>
                 <i className="fas fa-plus mr-1" />
                 Add Results
@@ -382,7 +382,7 @@ function ExamDetail({ id, onBack }: { id: string; onBack: () => void }) {
                         {r.short_comment || "—"}
                       </td>
                       <td className="py-2.5 px-3.5">
-                        {(isAdmin || isTeacher || isHOD) && (
+                        {(isAdmin || isTeacher || isHOD || isHOY) && (
                           <div className="flex gap-1">
                             <Btn variant="outline" size="sm" onClick={() => setEditMarksModal(r)}>
                               <i className="fas fa-pen mr-1" />
@@ -796,7 +796,7 @@ function ResultModal({
 
   // Teachers only see their assigned subjects
   const availableSubjects = useMemo(() => {
-    if (isAdmin || isHOD) return subjects;
+    if (isAdmin || isHOD || isHOY) return subjects;
     if (myTeacher) {
       const mySubjectIds = subjectTeachers
         .filter((st: any) => st.teacher_id === myTeacher.id)
