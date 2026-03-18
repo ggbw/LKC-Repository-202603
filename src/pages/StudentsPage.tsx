@@ -8,6 +8,7 @@ import {
   useSubjectTeachers,
   useStudentSubjects,
   useClassTeachers,
+  useParentStudents,
   useInvalidate,
 } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,13 +34,16 @@ import {
 
 export default function StudentsPage() {
   const { detail, setDetail, showToast } = useApp();
-  const { isAdmin, isTeacher, user, isClassTeacher, myClassAssignments: ctAssignments } = useAuth();
+  const { isAdmin, isTeacher, isParent, user, isClassTeacher, myClassAssignments: ctAssignments } = useAuth();
   const { data: students = [], isLoading } = useStudents();
   const { data: teachers = [] } = useTeachers();
   const { data: subjects = [] } = useSubjects();
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: studentSubjects = [] } = useStudentSubjects();
   const { data: classTeachers = [] } = useClassTeachers();
+  const { data: parentStudents = [] } = useParentStudents();
+  // Teacher dual-view: "my-class" | "my-subjects"
+  const [teacherView, setTeacherView] = useState<"my-class" | "my-subjects">("my-class");
   const [search, setSearch] = useState("");
   const [filterForm, setFilterForm] = useState("");
   const [filterClass, setFilterClass] = useState("");
@@ -61,8 +65,8 @@ export default function StudentsPage() {
     return classTeachers.filter((ct: any) => ct.teacher_id === myTeacher.id);
   }, [classTeachers, myTeacher]);
 
-  // Teachers only see students taking their subjects or in their class teacher classes
-  const visibleStudents = useMemo(() => {
+  // All students visible to this user (union of class + subject students for teachers)
+  const allVisibleStudents = useMemo(() => {
     if (isAdmin) return students;
     if (isTeacher && myTeacher) {
       const subjectStudentIds = new Set(
@@ -77,8 +81,41 @@ export default function StudentsPage() {
       );
       return students.filter((s: any) => subjectStudentIds.has(s.id) || classStudentIds.has(s.id));
     }
+    if (isParent) return students.filter((s: any) => myChildIds.has(s.id));
     return students;
-  }, [students, isAdmin, isTeacher, myTeacher, mySubjectIds, myClassAssignments, studentSubjects]);
+  }, [
+    students,
+    isAdmin,
+    isTeacher,
+    isParent,
+    myTeacher,
+    mySubjectIds,
+    myClassAssignments,
+    studentSubjects,
+    myChildIds,
+  ]);
+
+  // For teacher: apply dual-view filter on top of allVisibleStudents
+  const visibleStudents = useMemo(() => {
+    if (!isTeacher || isAdmin || !myTeacher) return allVisibleStudents;
+    if (teacherView === "my-class") {
+      return allVisibleStudents.filter((s: any) => classTeacherStudentIds.has(s.id));
+    }
+    // my-subjects: only students taking my subjects (excluding pure class students)
+    const subjectStudentIds = new Set(
+      studentSubjects.filter((ss: any) => mySubjectIds.includes(ss.subject_id)).map((ss: any) => ss.student_id),
+    );
+    return allVisibleStudents.filter((s: any) => subjectStudentIds.has(s.id));
+  }, [
+    allVisibleStudents,
+    isTeacher,
+    isAdmin,
+    myTeacher,
+    teacherView,
+    classTeacherStudentIds,
+    studentSubjects,
+    mySubjectIds,
+  ]);
 
   // For teacher view: map student → subjects taught by this teacher
   const studentSubjectMap = useMemo(() => {
@@ -105,6 +142,18 @@ export default function StudentsPage() {
         .map((s: any) => s.id),
     );
   }, [isTeacher, myTeacher, students, myClassAssignments]);
+
+  // Parent: find their record and linked children IDs
+  const myParentRecord = useMemo(
+    () => parentStudents.find((ps: any) => ps.parents?.user_id === user?.id)?.parents ?? null,
+    [parentStudents, user],
+  );
+  const myChildIds = useMemo(() => {
+    if (!myParentRecord) return new Set<string>();
+    return new Set(
+      parentStudents.filter((ps: any) => ps.parent_id === myParentRecord.id).map((ps: any) => ps.student_id as string),
+    );
+  }, [parentStudents, myParentRecord]);
 
   if (detail) return <StudentDetail id={detail} onBack={() => setDetail(null)} />;
 
@@ -178,14 +227,62 @@ export default function StudentsPage() {
 
   return (
     <div className="page-animate">
+      {/* ── Teacher dual-view tabs ── */}
+      {isTeacher && !isAdmin && (isClassTeacher || myClassAssignments.length > 0) && (
+        <div
+          className="flex gap-1 mb-4 p-1 rounded-lg"
+          style={{ background: "hsl(var(--surface2))", width: "fit-content" }}
+        >
+          {(
+            [
+              {
+                key: "my-class",
+                label: "My Class",
+                icon: "fa-chalkboard-teacher",
+                count: students.filter((s: any) => classTeacherStudentIds.has(s.id)).length,
+              },
+              {
+                key: "my-subjects",
+                label: "My Subject Students",
+                icon: "fa-book",
+                count: new Set(
+                  studentSubjects
+                    .filter((ss: any) => mySubjectIds.includes(ss.subject_id))
+                    .map((ss: any) => ss.student_id),
+                ).size,
+              },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTeacherView(t.key)}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-[12px] font-semibold border-none cursor-pointer transition-all"
+              style={{
+                background: teacherView === t.key ? "hsl(var(--surface))" : "transparent",
+                color: teacherView === t.key ? "hsl(var(--text))" : "hsl(var(--text2))",
+                boxShadow: teacherView === t.key ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              }}
+            >
+              <i className={`fas ${t.icon} text-[11px]`} />
+              {t.label}
+              <span className="text-[10px] opacity-60 font-mono">({t.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-4">
         <div>
           <div className="text-lg font-bold">
             <i className="fas fa-graduation-cap mr-2" />
-            Students
+            {isParent
+              ? "My Children"
+              : teacherView === "my-class" && isTeacher && !isAdmin
+                ? "My Class Students"
+                : "Students"}
           </div>
           <div className="text-[11px]" style={{ color: "hsl(var(--text2))" }}>
-            {visibleStudents.length} total
+            {visibleStudents.length} {isParent ? "children" : "students"}
           </div>
         </div>
         <div className="flex gap-2">
