@@ -220,15 +220,23 @@ export default function StudentsPage() {
     if (!file) return;
     try {
       const data = await parseExcel(file);
+      if (!data.length) { showToast("File is empty or unreadable", "error"); return; }
       let count = 0;
+      let firstError: string | null = null;
       for (const row of data) {
         const name = row["Full Name"] || row["full_name"] || row["Name"] || row["name"];
-        const form = row["Form"] || row["form"] || "Form 1";
+        const rawForm = row["Form"] || row["form"] || "";
+        // Normalise form: "1" → "Form 1", "Form1" → "Form 1", "Form 1" → "Form 1"
+        const form = rawForm
+          ? rawForm.toString().replace(/^form\s*/i, "").trim()
+            ? "Form " + rawForm.toString().replace(/^form\s*/i, "").trim()
+            : "Form 1"
+          : "Form 1";
         if (!name) continue;
         const { error } = await supabase.from("students").insert({
-          full_name: name,
+          full_name: String(name).trim(),
           form,
-          gender: (row["Gender"] || row["gender"] || "").toLowerCase() || null,
+          gender: (row["Gender"] || row["gender"] || "").toString().toLowerCase() || null,
           enrollment_number: row["Enrollment #"] || row["Enrollment"] || row["enrollment_number"] || null,
           class_name: row["Class"] || row["class_name"] || null,
           email: row["Email"] || row["email"] || null,
@@ -243,10 +251,12 @@ export default function StudentsPage() {
           passport_number: row["Passport Number"] || row["passport_number"] || null,
           state: "active",
         });
-        if (!error) count++;
+        if (error) { if (!firstError) firstError = error.message; }
+        else count++;
       }
-      showToast(`Imported ${count} students`);
-      invalidate(["students"]);
+      if (firstError) showToast(`Imported ${count}/${data.length} — Error: ${firstError}`, "error");
+      else showToast(`Imported ${count} student${count !== 1 ? "s" : ""}`);
+      if (count > 0) invalidate(["students"]);
     } catch (e: any) {
       showToast(e.message, "error");
     }
