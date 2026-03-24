@@ -173,6 +173,7 @@ function ParentModal({ id, parents, onClose }: { id: string | null; parents: any
   const { showToast } = useApp();
   const invalidate = useInvalidate();
   const { data: allStudents = [] } = useStudents();
+  const { data: parentStudents = [] } = useParentStudents();
   const existing = id ? parents.find((p: any) => p.id === id) : null;
 
   // Contact
@@ -188,10 +189,34 @@ function ParentModal({ id, parents, onClose }: { id: string | null; parents: any
   const [nationalId, setNationalId] = useState(existing?.national_id || '');
   const [passportNumber, setPassportNumber] = useState(existing?.passport_number || '');
 
-  // Child linking (new parent only)
+  // Child linking
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [linking, setLinking] = useState(false);
 
   const [saving, setSaving] = useState(false);
+
+  // Students already linked to this parent
+  const linkedStudentIds = new Set(
+    parentStudents.filter((ps: any) => ps.parent_id === id).map((ps: any) => ps.student_id)
+  );
+  const linkedStudents = allStudents.filter((s: any) => linkedStudentIds.has(s.id));
+  const unlinkableStudents = allStudents.filter((s: any) => !linkedStudentIds.has(s.id));
+
+  const addLink = async () => {
+    if (!selectedStudentId || !id) return;
+    setLinking(true);
+    const { error } = await supabase.from('parent_students').insert({ parent_id: id, student_id: selectedStudentId });
+    if (error) showToast(error.message, 'error');
+    else { invalidate(['parent_students']); setSelectedStudentId(''); showToast('Student linked'); }
+    setLinking(false);
+  };
+
+  const removeLink = async (studentId: string) => {
+    if (!id) return;
+    await supabase.from('parent_students').delete().eq('parent_id', id).eq('student_id', studentId);
+    invalidate(['parent_students']);
+    showToast('Link removed');
+  };
 
   const parentPayload = {
     name,
@@ -263,23 +288,57 @@ function ParentModal({ id, parents, onClose }: { id: string | null; parents: any
           <Field label="Passport Number"><FieldInput value={passportNumber} onChange={setPassportNumber} /></Field>
         </div>
 
-        {/* ── Link Child (new parent only) ── */}
-        {!id && (
+        {/* ── Children (Students) ── */}
+        <FormSection title="Children (Students)" />
+        {id ? (
           <>
-            <FormSection title="Link to Child (Student)" />
-            <div className="grid grid-cols-1 gap-3">
-              <Field label="Student">
-                <FieldSelect
-                  value={selectedStudentId}
-                  onChange={setSelectedStudentId}
-                  options={[
-                    { value: '', label: '— None / add later —' },
-                    ...allStudents.map((s: any) => ({ value: s.id, label: `${s.full_name} (${s.form}${s.class_name ? ' ' + s.class_name : ''})` })),
-                  ]}
-                />
-              </Field>
-            </div>
+            {linkedStudents.length > 0 ? (
+              <div className="flex flex-col gap-1 mb-3">
+                {linkedStudents.map((s: any) => (
+                  <div key={s.id} className="flex items-center justify-between rounded px-3 py-2 text-[12.5px]"
+                    style={{ background: 'hsl(var(--surface2))', border: '1px solid hsl(var(--border))' }}>
+                    <span className="font-semibold">{s.full_name}</span>
+                    <span className="text-[11px] mr-auto ml-2" style={{ color: 'hsl(var(--text2))' }}>
+                      {s.form}{s.class_name ? ' ' + s.class_name : ''}
+                    </span>
+                    <Btn variant="danger" size="sm" onClick={() => removeLink(s.id)}>Unlink</Btn>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] mb-3" style={{ color: 'hsl(var(--text2))' }}>No students linked yet.</p>
+            )}
+            {unlinkableStudents.length > 0 && (
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Field label="Add student">
+                    <FieldSelect
+                      value={selectedStudentId}
+                      onChange={setSelectedStudentId}
+                      options={[
+                        { value: '', label: '— Select student —' },
+                        ...unlinkableStudents.map((s: any) => ({ value: s.id, label: `${s.full_name} (${s.form}${s.class_name ? ' ' + s.class_name : ''})` })),
+                      ]}
+                    />
+                  </Field>
+                </div>
+                <Btn onClick={addLink} disabled={!selectedStudentId || linking}>
+                  {linking ? 'Linking…' : 'Link'}
+                </Btn>
+              </div>
+            )}
           </>
+        ) : (
+          <Field label="Student">
+            <FieldSelect
+              value={selectedStudentId}
+              onChange={setSelectedStudentId}
+              options={[
+                { value: '', label: '— None / add later —' },
+                ...allStudents.map((s: any) => ({ value: s.id, label: `${s.full_name} (${s.form}${s.class_name ? ' ' + s.class_name : ''})` })),
+              ]}
+            />
+          </Field>
         )}
       </ModalBody>
       <ModalFoot>

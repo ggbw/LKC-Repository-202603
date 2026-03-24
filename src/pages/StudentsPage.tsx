@@ -722,7 +722,34 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
   const { showToast } = useApp();
   const invalidate = useInvalidate();
   const { data: allParents = [] } = useParents();
+  const { data: parentStudents = [] } = useParentStudents();
   const existing = id ? students.find((s: any) => s.id === id) : null;
+
+  // Parents already linked to this student
+  const linkedParentIds = new Set(
+    parentStudents.filter((ps: any) => ps.student_id === id).map((ps: any) => ps.parent_id)
+  );
+  const linkedParents = (allParents as any[]).filter((p: any) => linkedParentIds.has(p.id));
+  const unlinkableParents = (allParents as any[]).filter((p: any) => !linkedParentIds.has(p.id));
+
+  const [linkParentId, setLinkParentId] = useState("");
+  const [linking, setLinking] = useState(false);
+
+  const addParentLink = async () => {
+    if (!linkParentId || !id) return;
+    setLinking(true);
+    const { error } = await supabase.from("parent_students").insert({ parent_id: linkParentId, student_id: id });
+    if (error) showToast(error.message, "error");
+    else { invalidate(["parent_students"]); setLinkParentId(""); showToast("Parent linked"); }
+    setLinking(false);
+  };
+
+  const removeParentLink = async (parentId: string) => {
+    if (!id) return;
+    await supabase.from("parent_students").delete().eq("parent_id", parentId).eq("student_id", id);
+    invalidate(["parent_students"]);
+    showToast("Link removed");
+  };
 
   // Basic info
   const [name, setName] = useState(existing?.full_name || "");
@@ -911,10 +938,48 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
           </Field>
         </div>
 
-        {/* ── Parent / Guardian (new student only) ── */}
-        {!id && (
+        {/* ── Parent / Guardian ── */}
+        <FormSection title="Parent / Guardian" />
+        {id ? (
           <>
-            <FormSection title="Parent / Guardian" />
+            {linkedParents.length > 0 ? (
+              <div className="flex flex-col gap-1 mb-3">
+                {linkedParents.map((p: any) => (
+                  <div key={p.id} className="flex items-center justify-between rounded px-3 py-2 text-[12.5px]"
+                    style={{ background: "hsl(var(--surface2))", border: "1px solid hsl(var(--border))" }}>
+                    <span className="font-semibold">{p.name}</span>
+                    <span className="text-[11px] mr-auto ml-2" style={{ color: "hsl(var(--text2))" }}>
+                      {p.relation ? cap(p.relation) : ""}
+                    </span>
+                    <Btn variant="danger" size="sm" onClick={() => removeParentLink(p.id)}>Unlink</Btn>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] mb-3" style={{ color: "hsl(var(--text2))" }}>No parent / guardian linked yet.</p>
+            )}
+            {unlinkableParents.length > 0 && (
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Field label="Add parent / guardian">
+                    <FieldSelect
+                      value={linkParentId}
+                      onChange={setLinkParentId}
+                      options={[
+                        { value: "", label: "— Select parent —" },
+                        ...unlinkableParents.map((p: any) => ({ value: p.id, label: `${p.name}${p.relation ? ` (${cap(p.relation)})` : ""}` })),
+                      ]}
+                    />
+                  </Field>
+                </div>
+                <Btn onClick={addParentLink} disabled={!linkParentId || linking}>
+                  {linking ? "Linking…" : "Link"}
+                </Btn>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <Field label="Link to">
                 <FieldSelect
