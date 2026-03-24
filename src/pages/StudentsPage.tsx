@@ -215,6 +215,22 @@ export default function StudentsPage() {
     showToast("Template downloaded");
   };
 
+  const excelDateToISO = (val: any): string | null => {
+    if (!val && val !== 0) return null;
+    // Already a proper date string
+    if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+    // Excel serial number (number of days since 1900-01-00, with leap-year bug)
+    if (typeof val === "number") {
+      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+      return date.toISOString().slice(0, 10);
+    }
+    // JS Date object
+    if (val instanceof Date) return val.toISOString().slice(0, 10);
+    // Try parsing a string like "01/15/2005" or "15-Jan-2005"
+    const parsed = new Date(val);
+    return isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+  };
+
   const handleImport = async () => {
     const file = await triggerFileUpload();
     if (!file) return;
@@ -241,8 +257,8 @@ export default function StudentsPage() {
           class_name: row["Class"] || row["class_name"] || null,
           email: row["Email"] || row["email"] || null,
           nationality: row["Nationality"] || row["nationality"] || null,
-          date_of_birth: row["Date of Birth"] || row["date_of_birth"] || null,
-          admission_date: row["Admission Date"] || row["admission_date"] || null,
+          date_of_birth: excelDateToISO(row["Date of Birth"] ?? row["date_of_birth"]),
+          admission_date: excelDateToISO(row["Admission Date"] ?? row["admission_date"]),
           academic_year: row["Academic Year"] || row["academic_year"] || null,
           previous_school: row["Previous School"] || row["previous_school"] || null,
           blood_group: row["Blood Group"] || row["blood_group"] || null,
