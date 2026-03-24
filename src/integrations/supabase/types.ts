@@ -783,6 +783,7 @@ export type Database = {
         Row: {
           academic_year: string | null
           admission_date: string | null
+          blood_group: string | null
           class_name: string | null
           created_at: string | null
           date_of_birth: string | null
@@ -792,13 +793,18 @@ export type Database = {
           full_name: string
           gender: string | null
           id: string
+          medical_condition: string | null
+          national_id: string | null
           nationality: string | null
+          passport_number: string | null
+          previous_school: string | null
           state: string | null
           user_id: string | null
         }
         Insert: {
           academic_year?: string | null
           admission_date?: string | null
+          blood_group?: string | null
           class_name?: string | null
           created_at?: string | null
           date_of_birth?: string | null
@@ -808,13 +814,18 @@ export type Database = {
           full_name: string
           gender?: string | null
           id?: string
+          medical_condition?: string | null
+          national_id?: string | null
           nationality?: string | null
+          passport_number?: string | null
+          previous_school?: string | null
           state?: string | null
           user_id?: string | null
         }
         Update: {
           academic_year?: string | null
           admission_date?: string | null
+          blood_group?: string | null
           class_name?: string | null
           created_at?: string | null
           date_of_birth?: string | null
@@ -824,7 +835,11 @@ export type Database = {
           full_name?: string
           gender?: string | null
           id?: string
+          medical_condition?: string | null
+          national_id?: string | null
           nationality?: string | null
+          passport_number?: string | null
+          previous_school?: string | null
           state?: string | null
           user_id?: string | null
         }

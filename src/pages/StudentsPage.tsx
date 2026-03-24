@@ -9,6 +9,7 @@ import {
   useStudentSubjects,
   useClassTeachers,
   useParentStudents,
+  useParents,
   useInvalidate,
 } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
@@ -652,53 +653,96 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
 function StudentModal({ id, students, onClose }: { id: string | null; students: any[]; onClose: () => void }) {
   const { showToast } = useApp();
+  const invalidate = useInvalidate();
+  const { data: allParents = [] } = useParents();
   const existing = id ? students.find((s: any) => s.id === id) : null;
+
+  // Basic info
   const [name, setName] = useState(existing?.full_name || "");
   const [form, setForm] = useState(existing?.form || "Form 1");
   const [gender, setGender] = useState(existing?.gender || "male");
   const [enrollment, setEnrollment] = useState(existing?.enrollment_number || "");
   const [className, setClassName] = useState(existing?.class_name || "");
   const [email, setEmail] = useState(existing?.email || "");
+  const [dob, setDob] = useState(existing?.date_of_birth || "");
+  const [nationality, setNationality] = useState(existing?.nationality || "");
+  const [admissionDate, setAdmissionDate] = useState(existing?.admission_date || "");
+  const [academicYear, setAcademicYear] = useState(existing?.academic_year || "");
   const [state, setState] = useState(existing?.state || "active");
+
+  // Identity
+  const [nationalId, setNationalId] = useState(existing?.national_id || "");
+  const [passportNumber, setPassportNumber] = useState(existing?.passport_number || "");
+
+  // Academic history
+  const [previousSchool, setPreviousSchool] = useState(existing?.previous_school || "");
+
+  // Medical
+  const [bloodGroup, setBloodGroup] = useState(existing?.blood_group || "");
+  const [medicalCondition, setMedicalCondition] = useState(existing?.medical_condition || "");
+
+  // Parent / Guardian (new student only)
+  const [parentMode, setParentMode] = useState<"existing" | "new">("new");
+  const [selectedParentId, setSelectedParentId] = useState("");
+  const [parentName, setParentName] = useState("");
+  const [parentRelation, setParentRelation] = useState("guardian");
+  const [parentPhone, setParentPhone] = useState("");
+  const [parentEmail, setParentEmail] = useState("");
+
   const [saving, setSaving] = useState(false);
+
+  const studentPayload = {
+    full_name: name,
+    form,
+    gender,
+    enrollment_number: enrollment || null,
+    class_name: className || null,
+    email: email || null,
+    date_of_birth: dob || null,
+    nationality: nationality || null,
+    admission_date: admissionDate || null,
+    academic_year: academicYear || null,
+    national_id: nationalId || null,
+    passport_number: passportNumber || null,
+    previous_school: previousSchool || null,
+    blood_group: bloodGroup || null,
+    medical_condition: medicalCondition || null,
+    state,
+  };
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
+
     if (id) {
-      const { error } = await supabase
-        .from("students")
-        .update({
-          full_name: name,
-          form,
-          gender,
-          enrollment_number: enrollment || null,
-          class_name: className || null,
-          email: email || null,
-          state,
-        })
-        .eq("id", id);
-      if (error) {
-        showToast(error.message, "error");
-        setSaving(false);
-        return;
-      }
+      const { error } = await supabase.from("students").update(studentPayload).eq("id", id);
+      if (error) { showToast(error.message, "error"); setSaving(false); return; }
       showToast("Student updated");
     } else {
-      const { error } = await supabase.from("students").insert({
-        full_name: name,
-        form,
-        gender,
-        enrollment_number: enrollment || null,
-        class_name: className || null,
-        email: email || null,
-        state: "active",
-      });
-      if (error) {
-        showToast(error.message, "error");
-        setSaving(false);
-        return;
+      const { data: inserted, error } = await supabase
+        .from("students")
+        .insert({ ...studentPayload, state: "active" })
+        .select("id")
+        .single();
+      if (error) { showToast(error.message, "error"); setSaving(false); return; }
+
+      const studentId = inserted.id;
+
+      // Link parent
+      if (parentMode === "existing" && selectedParentId) {
+        await supabase.from("parent_students").insert({ parent_id: selectedParentId, student_id: studentId });
+      } else if (parentMode === "new" && parentName.trim()) {
+        const { data: newParent, error: pe } = await supabase
+          .from("parents")
+          .insert({ name: parentName, relation: parentRelation, phone: parentPhone || null, email: parentEmail || null })
+          .select("id")
+          .single();
+        if (!pe && newParent) {
+          await supabase.from("parent_students").insert({ parent_id: newParent.id, student_id: studentId });
+        }
       }
+
+      invalidate(["students", "parents", "parent_students"]);
       showToast(`Student "${name}" created`);
     }
     onClose();
@@ -708,6 +752,7 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
     <Modal onClose={onClose}>
       <ModalHead title={id ? "Edit Student" : "Add Student"} onClose={onClose} />
       <ModalBody>
+        {/* ── Basic Information ── */}
         <FormSection title="Basic Information" />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Full Name" required>
@@ -722,41 +767,137 @@ function StudentModal({ id, students, onClose }: { id: string | null; students: 
             <FieldSelect
               value={gender}
               onChange={setGender}
-              options={[
-                { value: "male", label: "Male" },
-                { value: "female", label: "Female" },
-              ]}
+              options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }]}
             />
           </Field>
+          <Field label="Date of Birth">
+            <FieldInput value={dob} onChange={setDob} type="date" />
+          </Field>
+          <Field label="Nationality">
+            <FieldInput value={nationality} onChange={setNationality} placeholder="e.g. Botswana" />
+          </Field>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
           <Field label="Enrollment #">
             <FieldInput value={enrollment} onChange={setEnrollment} />
           </Field>
           <Field label="Class">
             <FieldInput value={className} onChange={setClassName} placeholder="e.g. B, M, K" />
           </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <Field label="Email">
             <FieldInput value={email} onChange={setEmail} type="email" />
           </Field>
-          {id && (
-            <Field label="Status">
-              <FieldSelect
-                value={state}
-                onChange={setState}
-                options={["active", "suspended", "graduated", "transferred", "inactive"].map((s) => ({
-                  value: s,
-                  label: cap(s),
-                }))}
-              />
-            </Field>
-          )}
         </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Admission Date">
+            <FieldInput value={admissionDate} onChange={setAdmissionDate} type="date" />
+          </Field>
+          <Field label="Academic Year">
+            <FieldInput value={academicYear} onChange={setAcademicYear} placeholder="e.g. 2026" />
+          </Field>
+          <Field label="Status">
+            <FieldSelect
+              value={state}
+              onChange={setState}
+              options={["active", "suspended", "graduated", "transferred", "inactive"].map((s) => ({
+                value: s,
+                label: cap(s),
+              }))}
+            />
+          </Field>
+        </div>
+
+        {/* ── Identity Documents ── */}
+        <FormSection title="Identity Documents" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="National ID">
+            <FieldInput value={nationalId} onChange={setNationalId} />
+          </Field>
+          <Field label="Passport Number">
+            <FieldInput value={passportNumber} onChange={setPassportNumber} />
+          </Field>
+        </div>
+
+        {/* ── Academic History ── */}
+        <FormSection title="Academic History" />
+        <div className="grid grid-cols-1 gap-3">
+          <Field label="Previous School">
+            <FieldInput value={previousSchool} onChange={setPreviousSchool} placeholder="Name of previous school" />
+          </Field>
+        </div>
+
+        {/* ── Medical Information ── */}
+        <FormSection title="Medical Information" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Blood Group">
+            <FieldSelect
+              value={bloodGroup}
+              onChange={setBloodGroup}
+              options={[
+                { value: "", label: "Unknown" },
+                ...["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((g) => ({ value: g, label: g })),
+              ]}
+            />
+          </Field>
+          <Field label="Medical Condition / Allergies">
+            <FieldInput value={medicalCondition} onChange={setMedicalCondition} placeholder="e.g. Asthma, Peanut allergy" />
+          </Field>
+        </div>
+
+        {/* ── Parent / Guardian (new student only) ── */}
+        {!id && (
+          <>
+            <FormSection title="Parent / Guardian" />
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <Field label="Link to">
+                <FieldSelect
+                  value={parentMode}
+                  onChange={(v) => setParentMode(v as "existing" | "new")}
+                  options={[
+                    { value: "new", label: "Add new parent" },
+                    { value: "existing", label: "Select existing parent" },
+                  ]}
+                />
+              </Field>
+              {parentMode === "existing" ? (
+                <Field label="Parent">
+                  <FieldSelect
+                    value={selectedParentId}
+                    onChange={setSelectedParentId}
+                    options={[
+                      { value: "", label: "— Select —" },
+                      ...allParents.map((p: any) => ({ value: p.id, label: `${p.name}${p.relation ? ` (${cap(p.relation)})` : ""}` })),
+                    ]}
+                  />
+                </Field>
+              ) : (
+                <Field label="Full Name">
+                  <FieldInput value={parentName} onChange={setParentName} placeholder="Parent / Guardian name" />
+                </Field>
+              )}
+            </div>
+            {parentMode === "new" && (
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Relation">
+                  <FieldSelect
+                    value={parentRelation}
+                    onChange={setParentRelation}
+                    options={["father", "mother", "guardian", "grandparent", "other"].map((r) => ({ value: r, label: cap(r) }))}
+                  />
+                </Field>
+                <Field label="Phone">
+                  <FieldInput value={parentPhone} onChange={setParentPhone} type="tel" />
+                </Field>
+                <Field label="Email">
+                  <FieldInput value={parentEmail} onChange={setParentEmail} type="email" />
+                </Field>
+              </div>
+            )}
+          </>
+        )}
       </ModalBody>
       <ModalFoot>
-        <Btn variant="outline" onClick={onClose}>
-          Cancel
-        </Btn>
+        <Btn variant="outline" onClick={onClose}>Cancel</Btn>
         <Btn onClick={save} disabled={saving}>
           {saving ? "Saving…" : id ? "Update" : "Create"}
         </Btn>
