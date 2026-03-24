@@ -152,6 +152,23 @@ export default function FacultyPage() {
     showToast("Teachers exported");
   };
 
+  const handleDownloadTemplate = () => {
+    downloadExcel(
+      [
+        {
+          Name: "",
+          Code: "",
+          Department: "",
+          Email: "",
+          Phone: "",
+        },
+      ],
+      "teachers_import_template",
+      "Teachers",
+    );
+    showToast("Template downloaded");
+  };
+
   const handleImport = async () => {
     const file = await triggerFileUpload();
     if (!file) return;
@@ -161,11 +178,10 @@ export default function FacultyPage() {
       for (const row of data) {
         const name = row["Name"] || row["name"];
         if (!name) continue;
-        const dept = row["Department"] || row["department"] || null;
         const { error } = await supabase.from("teachers").insert({
           name,
           code: row["Code"] || row["code"] || null,
-          department: dept || null,
+          department: row["Department"] || row["department"] || null,
           email: row["Email"] || row["email"] || null,
           phone: row["Phone"] || row["phone"] || null,
         });
@@ -201,9 +217,14 @@ export default function FacultyPage() {
             ⬇ Export
           </Btn>
           {isAdmin && (
-            <Btn variant="outline" onClick={handleImport}>
-              ⬆ Import
-            </Btn>
+            <>
+              <Btn variant="outline" onClick={handleDownloadTemplate}>
+                <i className="fas fa-file-excel mr-1" />Template
+              </Btn>
+              <Btn variant="outline" onClick={handleImport}>
+                ⬆ Import
+              </Btn>
+            </>
           )}
           {isAdmin && <Btn onClick={() => setModal("new")}>＋ New Teacher</Btn>}
         </div>

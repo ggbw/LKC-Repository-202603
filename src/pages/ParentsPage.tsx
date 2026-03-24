@@ -63,6 +63,27 @@ export default function ParentsPage() {
     showToast('Parents exported');
   };
 
+  const handleDownloadTemplate = () => {
+    downloadExcel(
+      [
+        {
+          'Name': '',
+          'Relation': '',
+          'Phone': '',
+          'Alternative Phone': '',
+          'Email': '',
+          'Occupation': '',
+          'Home Address': '',
+          'National ID': '',
+          'Passport Number': '',
+        },
+      ],
+      'parents_import_template',
+      'Parents',
+    );
+    showToast('Template downloaded');
+  };
+
   const handleImport = async () => {
     const file = await triggerFileUpload();
     if (!file) return;
@@ -73,9 +94,15 @@ export default function ParentsPage() {
         const name = row['Name'] || row['name'];
         if (!name) continue;
         const { error } = await supabase.from('parents').insert({
-          name, relation: row['Relation'] || row['relation'] || null,
+          name,
+          relation: row['Relation'] || row['relation'] || null,
           phone: row['Phone'] || row['phone'] || null,
+          alternative_phone: row['Alternative Phone'] || row['alternative_phone'] || null,
           email: row['Email'] || row['email'] || null,
+          occupation: row['Occupation'] || row['occupation'] || null,
+          address: row['Home Address'] || row['address'] || null,
+          national_id: row['National ID'] || row['national_id'] || null,
+          passport_number: row['Passport Number'] || row['passport_number'] || null,
         });
         if (!error) count++;
       }
@@ -92,6 +119,7 @@ export default function ParentsPage() {
         <div><div className="text-lg font-bold">Parents</div><div className="text-[11px]" style={{ color: 'hsl(var(--text2))' }}>{parents.length} total</div></div>
         <div className="flex gap-2">
           <Btn variant="outline" onClick={handleExport}>⬇ Export</Btn>
+          {isAdmin && <Btn variant="outline" onClick={handleDownloadTemplate}><i className="fas fa-file-excel mr-1" />Template</Btn>}
           {isAdmin && <Btn variant="outline" onClick={handleImport}>⬆ Import</Btn>}
           {isAdmin && <Btn onClick={() => setModal('new')}>＋ New Parent</Btn>}
         </div>
