@@ -603,7 +603,13 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
   const { data: studentSubjects = [] } = useStudentSubjects(id);
   const { data: subjectTeachers = [] } = useSubjectTeachers();
   const { data: classTeachers = [] } = useClassTeachers();
+  const { data: allParents = [] } = useParents();
+  const { data: parentStudents = [] } = useParentStudents();
   const s = students.find((x: any) => x.id === id) as any;
+
+  const guardians = (allParents as any[]).filter((p: any) =>
+    parentStudents.some((ps: any) => ps.student_id === id && ps.parent_id === p.id)
+  );
   if (!s)
     return (
       <>
@@ -714,6 +720,34 @@ function StudentDetail({ id, onBack }: { id: string; onBack: () => void }) {
           </Card>
         </div>
       </div>
+
+      {/* ── Parent / Guardian ── */}
+      <Card
+        title={
+          <>
+            <i className="fas fa-user-shield mr-1.5" />
+            Parent / Guardian
+          </>
+        }
+        className="mt-4"
+      >
+        {guardians.length === 0 ? (
+          <div className="text-xs" style={{ color: "hsl(var(--text3))" }}>No guardian linked</div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {guardians.map((g: any) => (
+              <div key={g.id} className="grid grid-cols-2 gap-x-6 gap-y-1 pb-3"
+                style={{ borderBottom: "1px solid hsl(var(--border))" }}>
+                <InfoRow label="Name" value={g.name} />
+                <InfoRow label="Relation" value={cap(g.relation || "—")} />
+                <InfoRow label="Phone" value={g.phone || "—"} />
+                <InfoRow label="Email" value={g.email || "—"} />
+                {g.alternative_phone && <InfoRow label="Alt Phone" value={g.alternative_phone} />}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }
