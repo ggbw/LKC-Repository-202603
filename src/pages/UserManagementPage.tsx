@@ -11,6 +11,7 @@ import {
   useInvalidate,
 } from "@/hooks/useSupabaseData";
 import { supabase } from "@/integrations/supabase/client";
+import { FORMS, cap } from "@/data/database";
 import { downloadExcel, downloadCSV, parseExcel, triggerFileUpload } from "@/lib/excel";
 import {
   Card,
@@ -21,6 +22,7 @@ import {
   ModalHead,
   ModalBody,
   ModalFoot,
+  FormSection,
   Field,
   FieldInput,
   FieldSelect,
@@ -1175,24 +1177,63 @@ function CreateUserModal({
   onClose: (created?: { email: string; password: string; name: string; role: string }) => void;
 }) {
   const { showToast } = useApp();
+  const invalidate = useInvalidate();
   const { data: departmentsData = [] } = useDepartments();
   const DEPARTMENTS = departmentsData.map((d: any) => d.name);
   const { data: teachers = [] } = useTeachers();
   const { data: students = [] } = useStudents();
   const { data: parents = [] } = useParents();
+
+  // ── Core account fields ──
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("teacher");
-  const [dept, setDept] = useState("");
   const [linkMode, setLinkMode] = useState<"new" | "existing">("new");
   const [linkId, setLinkId] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // ── Teacher fields ──
+  const [dept, setDept] = useState("");
+
+  // ── Student fields ──
+  const [sForm, setSForm] = useState("Form 1");
+  const [sGender, setSGender] = useState("male");
+  const [sDob, setSdob] = useState("");
+  const [sNationality, setSNationality] = useState("");
+  const [sEnrollment, setSEnrollment] = useState("");
+  const [sClass, setSClass] = useState("");
+  const [sAdmissionDate, setSAdmissionDate] = useState("");
+  const [sAcademicYear, setSAcademicYear] = useState("");
+  const [sPreviousSchool, setSPreviousSchool] = useState("");
+  const [sBloodGroup, setSBloodGroup] = useState("");
+  const [sMedical, setSMedical] = useState("");
+  const [sNationalId, setSNationalId] = useState("");
+  const [sPassport, setSPassport] = useState("");
+  // parent to link to student
+  const [sParentId, setSParentId] = useState("");
+
+  // ── Parent fields ──
+  const [pRelation, setPRelation] = useState("guardian");
+  const [pPhone, setPPhone] = useState("");
+  const [pAltPhone, setPAltPhone] = useState("");
+  const [pAddress, setPAddress] = useState("");
+  const [pOccupation, setPOccupation] = useState("");
+  const [pNationalId, setPNationalId] = useState("");
+  const [pPassport, setPPassport] = useState("");
+  // student to link to parent
+  const [pStudentId, setPStudentId] = useState("");
+
   const linkableRecords = useMemo(() => {
     const table = role === "teacher" ? teachers : role === "student" ? students : parents;
-    // Only show unlinked records (no user_id)
     return (table as any[]).filter((r: any) => !r.user_id);
   }, [role, teachers, students, parents]);
+
+  const handleRoleChange = (v: string) => {
+    setRole(v);
+    setLinkId("");
+    setLinkMode("new");
+    if (v !== "teacher") setDept("");
+  };
 
   const save = async () => {
     if (!name.trim() || !email.trim()) return;
@@ -1216,35 +1257,105 @@ function CreateUserModal({
       return;
     }
 
-    // If teacher and creating new record, create the teachers row
-    if (role === "teacher" && linkMode === "new" && data?.user_id) {
-      await (supabase as any)
-        .from("teachers")
-        .insert({ name: name.trim(), email: email.trim(), department: dept || null, user_id: data.user_id });
+    const userId = data?.user_id;
+
+    if (linkMode === "new" && userId) {
+      if (role === "teacher") {
+        await (supabase as any)
+          .from("teachers")
+          .insert({ name: name.trim(), email: email.trim(), department: dept || null, user_id: userId });
+
+      } else if (role === "student") {
+        const { data: newStudent } = await (supabase as any)
+          .from("students")
+          .insert({
+            full_name: name.trim(),
+            email: email.trim(),
+            form: sForm,
+            gender: sGender,
+            date_of_birth: sDob || null,
+            nationality: sNationality || null,
+            enrollment_number: sEnrollment || null,
+            class_name: sClass || null,
+            admission_date: sAdmissionDate || null,
+            academic_year: sAcademicYear || null,
+            previous_school: sPreviousSchool || null,
+            blood_group: sBloodGroup || null,
+            medical_condition: sMedical || null,
+            national_id: sNationalId || null,
+            passport_number: sPassport || null,
+            state: "active",
+            user_id: userId,
+          })
+          .select("id")
+          .single();
+        if (newStudent && sParentId) {
+          await supabase.from("parent_students").insert({ parent_id: sParentId, student_id: newStudent.id });
+        }
+
+      } else if (role === "parent") {
+        const { data: newParent } = await (supabase as any)
+          .from("parents")
+          .insert({
+            name: name.trim(),
+            email: email.trim(),
+            relation: pRelation,
+            phone: pPhone || null,
+            alternative_phone: pAltPhone || null,
+            address: pAddress || null,
+            occupation: pOccupation || null,
+            national_id: pNationalId || null,
+            passport_number: pPassport || null,
+            user_id: userId,
+          })
+          .select("id")
+          .single();
+        if (newParent && pStudentId) {
+          await supabase.from("parent_students").insert({ parent_id: newParent.id, student_id: pStudentId });
+        }
+      }
     }
 
+    invalidate(["students", "parents", "parent_students", "teachers"]);
     showToast(`User "${name}" created with password: ${password}`);
     onClose({ email, password, name, role });
   };
+
+  const linkToggle = (
+    <div className="flex gap-2 mb-2">
+      {(["new", "existing"] as const).map((m) => (
+        <button
+          key={m}
+          onClick={() => { setLinkMode(m); setLinkId(""); }}
+          className="px-3 py-1.5 rounded text-[11px] font-semibold border cursor-pointer"
+          style={{
+            background: linkMode === m ? "hsl(var(--primary))" : "hsl(var(--surface2))",
+            color: linkMode === m ? "#fff" : "hsl(var(--text2))",
+            borderColor: "hsl(var(--border))",
+          }}
+        >
+          {m === "new" ? "Create new record" : "Link to existing"}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <Modal onClose={() => onClose()}>
       <ModalHead title="Create User Account" onClose={() => onClose()} />
       <ModalBody>
-        <Field label="Full Name" required>
-          <FieldInput value={name} onChange={setName} />
-        </Field>
-        <Field label="Email" required>
-          <FieldInput value={email} onChange={setEmail} type="email" />
-        </Field>
+        {/* ── Account ── */}
+        <FormSection title="Account" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Full Name" required>
+            <FieldInput value={name} onChange={setName} />
+          </Field>
+          <Field label="Email" required>
+            <FieldInput value={email} onChange={setEmail} type="email" />
+          </Field>
+        </div>
         <Field label="Role" required>
-          <FieldSelect
-            value={role}
-            onChange={(v) => {
-              setRole(v);
-              setLinkId("");
-              if (v !== "teacher") setDept("");
-            }}
+          <FieldSelect value={role} onChange={handleRoleChange}
             options={[
               { value: "admin", label: "Admin" },
               { value: "teacher", label: "Teacher" },
@@ -1253,77 +1364,144 @@ function CreateUserModal({
             ]}
           />
         </Field>
-        {role === "teacher" && (
-          <Field label="Department">
-            <select
-              className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
-              style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
-              value={dept}
-              onChange={(e) => setDept(e.target.value)}
-            >
-              <option value="">— Select Department (optional) —</option>
-              {DEPARTMENTS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
-        {/* Link to existing person record */}
+
+        {/* ── Link toggle (non-admin) ── */}
         {["teacher", "student", "parent"].includes(role) && linkableRecords.length > 0 && (
-          <Field label="Link to existing record?">
-            <div className="flex gap-2 mb-2">
-              {["new", "existing"].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => {
-                    setLinkMode(m as any);
-                    setLinkId("");
-                  }}
-                  className="px-3 py-1.5 rounded text-[11px] font-semibold border cursor-pointer"
-                  style={{
-                    background: linkMode === m ? "hsl(var(--primary))" : "hsl(var(--surface2))",
-                    color: linkMode === m ? "#fff" : "hsl(var(--text2))",
-                    borderColor: "hsl(var(--border))",
-                  }}
-                >
-                  {m === "new" ? "Create new record" : "Link to existing"}
-                </button>
-              ))}
-            </div>
+          <Field label={`Link to existing ${role} record?`}>
+            {linkToggle}
             {linkMode === "existing" && (
-              <select
-                className="w-full border rounded-md py-[7px] px-3 text-[12.5px]"
-                style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--surface))" }}
+              <FieldSelect
                 value={linkId}
-                onChange={(e) => setLinkId(e.target.value)}
-              >
-                <option value="">— Select existing {role} —</option>
-                {linkableRecords.map((r: any) => (
-                  <option key={r.id} value={r.id}>
-                    {r.full_name || r.name} {r.email ? `(${r.email})` : ""}
-                  </option>
-                ))}
-              </select>
+                onChange={setLinkId}
+                options={[
+                  { value: "", label: `— Select existing ${role} —` },
+                  ...linkableRecords.map((r: any) => ({
+                    value: r.id,
+                    label: `${r.full_name || r.name}${r.email ? ` (${r.email})` : ""}`,
+                  })),
+                ]}
+              />
             )}
           </Field>
         )}
-        <div
-          className="rounded-md px-3 py-2 text-[11px]"
-          style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}
-        >
-          <i className="fas fa-info-circle mr-1" />A random password will be generated. Download credentials after
-          creation.
+
+        {/* ── Teacher fields (new record) ── */}
+        {role === "teacher" && linkMode === "new" && (
+          <>
+            <FormSection title="Teacher Details" />
+            <Field label="Department">
+              <FieldSelect value={dept} onChange={setDept}
+                options={[{ value: "", label: "— Select Department (optional) —" }, ...DEPARTMENTS.map((d: string) => ({ value: d, label: d }))]}
+              />
+            </Field>
+          </>
+        )}
+
+        {/* ── Student fields (new record) ── */}
+        {role === "student" && linkMode === "new" && (
+          <>
+            <FormSection title="Student Details" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Form" required>
+                <FieldSelect value={sForm} onChange={setSForm} options={FORMS.map((f) => ({ value: f, label: f }))} />
+              </Field>
+              <Field label="Gender">
+                <FieldSelect value={sGender} onChange={setSGender}
+                  options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }]} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Date of Birth"><FieldInput value={sDob} onChange={setSdob} type="date" /></Field>
+              <Field label="Nationality"><FieldInput value={sNationality} onChange={setSNationality} placeholder="e.g. Botswana" /></Field>
+              <Field label="Class"><FieldInput value={sClass} onChange={setSClass} placeholder="e.g. A, B" /></Field>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Enrollment #"><FieldInput value={sEnrollment} onChange={setSEnrollment} /></Field>
+              <Field label="Admission Date"><FieldInput value={sAdmissionDate} onChange={setSAdmissionDate} type="date" /></Field>
+              <Field label="Academic Year"><FieldInput value={sAcademicYear} onChange={setSAcademicYear} placeholder="e.g. 2026" /></Field>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <Field label="Previous School"><FieldInput value={sPreviousSchool} onChange={setSPreviousSchool} /></Field>
+            </div>
+            <FormSection title="Identity & Medical" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="National ID"><FieldInput value={sNationalId} onChange={setSNationalId} /></Field>
+              <Field label="Passport Number"><FieldInput value={sPassport} onChange={setSPassport} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Blood Group">
+                <FieldSelect value={sBloodGroup} onChange={setSBloodGroup}
+                  options={[
+                    { value: "", label: "Unknown" },
+                    ...["A+","A-","B+","B-","AB+","AB-","O+","O-"].map((g) => ({ value: g, label: g })),
+                  ]}
+                />
+              </Field>
+              <Field label="Medical Condition / Allergies">
+                <FieldInput value={sMedical} onChange={setSMedical} placeholder="e.g. Asthma" />
+              </Field>
+            </div>
+            <FormSection title="Parent / Guardian" />
+            <Field label="Link to existing parent">
+              <FieldSelect value={sParentId} onChange={setSParentId}
+                options={[
+                  { value: "", label: "— None / add later —" },
+                  ...(parents as any[]).map((p: any) => ({
+                    value: p.id,
+                    label: `${p.name}${p.relation ? ` (${cap(p.relation)})` : ""}`,
+                  })),
+                ]}
+              />
+            </Field>
+          </>
+        )}
+
+        {/* ── Parent fields (new record) ── */}
+        {role === "parent" && linkMode === "new" && (
+          <>
+            <FormSection title="Parent Details" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Relation">
+                <FieldSelect value={pRelation} onChange={setPRelation}
+                  options={["father","mother","guardian","grandparent","other"].map((r) => ({ value: r, label: cap(r) }))} />
+              </Field>
+              <Field label="Occupation"><FieldInput value={pOccupation} onChange={setPOccupation} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Phone"><FieldInput value={pPhone} onChange={setPPhone} type="tel" /></Field>
+              <Field label="Alternative Phone"><FieldInput value={pAltPhone} onChange={setPAltPhone} type="tel" /></Field>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              <Field label="Home Address"><FieldInput value={pAddress} onChange={setPAddress} /></Field>
+            </div>
+            <FormSection title="Identity Documents" />
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="National ID"><FieldInput value={pNationalId} onChange={setPNationalId} /></Field>
+              <Field label="Passport Number"><FieldInput value={pPassport} onChange={setPPassport} /></Field>
+            </div>
+            <FormSection title="Link to Child (Student)" />
+            <Field label="Student">
+              <FieldSelect value={pStudentId} onChange={setPStudentId}
+                options={[
+                  { value: "", label: "— None / add later —" },
+                  ...(students as any[]).map((s: any) => ({
+                    value: s.id,
+                    label: `${s.full_name} (${s.form}${s.class_name ? " " + s.class_name : ""})`,
+                  })),
+                ]}
+              />
+            </Field>
+          </>
+        )}
+
+        <div className="rounded-md px-3 py-2 text-[11px] mt-2"
+          style={{ background: "#ddf4ff", border: "1px solid #addcff", color: "#0969da" }}>
+          <i className="fas fa-info-circle mr-1" />A random password will be generated. Download credentials after creation.
         </div>
       </ModalBody>
       <ModalFoot>
-        <Btn variant="outline" onClick={() => onClose()}>
-          Cancel
-        </Btn>
-        <Btn onClick={save} disabled={saving}>
-          {saving ? "Creating…" : "Create User"}
-        </Btn>
+        <Btn variant="outline" onClick={() => onClose()}>Cancel</Btn>
+        <Btn onClick={save} disabled={saving}>{saving ? "Creating…" : "Create User"}</Btn>
       </ModalFoot>
     </Modal>
   );

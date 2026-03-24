@@ -508,28 +508,43 @@ export type Database = {
       }
       parents: {
         Row: {
+          address: string | null
+          alternative_phone: string | null
           created_at: string | null
           email: string | null
           id: string
           name: string
+          national_id: string | null
+          occupation: string | null
+          passport_number: string | null
           phone: string | null
           relation: string | null
           user_id: string | null
         }
         Insert: {
+          address?: string | null
+          alternative_phone?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           name: string
+          national_id?: string | null
+          occupation?: string | null
+          passport_number?: string | null
           phone?: string | null
           relation?: string | null
           user_id?: string | null
         }
         Update: {
+          address?: string | null
+          alternative_phone?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           name?: string
+          national_id?: string | null
+          occupation?: string | null
+          passport_number?: string | null
           phone?: string | null
           relation?: string | null
           user_id?: string | null

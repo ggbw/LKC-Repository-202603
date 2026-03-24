@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { useParents, useParentStudents, useInvalidate } from '@/hooks/useSupabaseData';
+import { useParents, useParentStudents, useStudents, useInvalidate } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { cap } from '@/data/database';
 import { downloadExcel, parseExcel, triggerFileUpload } from '@/lib/excel';
 import { Badge, Card, InfoRow, SearchBar, BackBtn, Btn,
-  Modal, ModalHead, ModalBody, ModalFoot, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
+  Modal, ModalHead, ModalBody, ModalFoot, FormSection, Field, FieldInput, FieldSelect } from '@/components/SharedUI';
 
 export default function ParentsPage() {
   const { detail, setDetail, setPage, showToast } = useApp();
@@ -143,23 +143,61 @@ export default function ParentsPage() {
 
 function ParentModal({ id, parents, onClose }: { id: string | null; parents: any[]; onClose: () => void }) {
   const { showToast } = useApp();
+  const invalidate = useInvalidate();
+  const { data: allStudents = [] } = useStudents();
   const existing = id ? parents.find((p: any) => p.id === id) : null;
+
+  // Contact
   const [name, setName] = useState(existing?.name || '');
   const [relation, setRelation] = useState(existing?.relation || 'father');
   const [phone, setPhone] = useState(existing?.phone || '');
+  const [altPhone, setAltPhone] = useState(existing?.alternative_phone || '');
   const [email, setEmail] = useState(existing?.email || '');
+  const [address, setAddress] = useState(existing?.address || '');
+  const [occupation, setOccupation] = useState(existing?.occupation || '');
+
+  // Identity
+  const [nationalId, setNationalId] = useState(existing?.national_id || '');
+  const [passportNumber, setPassportNumber] = useState(existing?.passport_number || '');
+
+  // Child linking (new parent only)
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+
   const [saving, setSaving] = useState(false);
+
+  const parentPayload = {
+    name,
+    relation,
+    phone: phone || null,
+    alternative_phone: altPhone || null,
+    email: email || null,
+    address: address || null,
+    occupation: occupation || null,
+    national_id: nationalId || null,
+    passport_number: passportNumber || null,
+  };
 
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
     if (id) {
-      const { error } = await supabase.from('parents').update({ name, relation, phone: phone || null, email: email || null }).eq('id', id);
+      const { error } = await supabase.from('parents').update(parentPayload).eq('id', id);
       if (error) { showToast(error.message, 'error'); setSaving(false); return; }
       showToast('Parent updated');
     } else {
-      const { error } = await supabase.from('parents').insert({ name, relation, phone: phone || null, email: email || null });
+      const { data: newParent, error } = await supabase
+        .from('parents')
+        .insert(parentPayload)
+        .select('id')
+        .single();
       if (error) { showToast(error.message, 'error'); setSaving(false); return; }
+
+      // Link child if selected
+      if (selectedStudentId && newParent) {
+        await supabase.from('parent_students').insert({ parent_id: newParent.id, student_id: selectedStudentId });
+      }
+
+      invalidate(['parents', 'parent_students']);
       showToast(`Parent "${name}" created`);
     }
     onClose();
@@ -167,16 +205,54 @@ function ParentModal({ id, parents, onClose }: { id: string | null; parents: any
 
   return (
     <Modal onClose={onClose}>
-      <ModalHead title={id ? '✏️ Edit Parent' : '➕ Add Parent'} onClose={onClose} />
+      <ModalHead title={id ? 'Edit Parent' : 'Add Parent'} onClose={onClose} />
       <ModalBody>
+        {/* ── Contact Information ── */}
+        <FormSection title="Contact Information" />
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Name" required><FieldInput value={name} onChange={setName} /></Field>
-          <Field label="Relation"><FieldSelect value={relation} onChange={setRelation} options={['father','mother','guardian','grandparent','other'].map(r => ({ value: r, label: cap(r) }))} /></Field>
+          <Field label="Full Name" required><FieldInput value={name} onChange={setName} /></Field>
+          <Field label="Relation">
+            <FieldSelect value={relation} onChange={setRelation}
+              options={['father','mother','guardian','grandparent','other'].map(r => ({ value: r, label: cap(r) }))} />
+          </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Phone"><FieldInput value={phone} onChange={setPhone} /></Field>
+          <Field label="Phone"><FieldInput value={phone} onChange={setPhone} type="tel" /></Field>
+          <Field label="Alternative Phone"><FieldInput value={altPhone} onChange={setAltPhone} type="tel" /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Email"><FieldInput value={email} onChange={setEmail} type="email" /></Field>
+          <Field label="Occupation"><FieldInput value={occupation} onChange={setOccupation} placeholder="e.g. Engineer" /></Field>
         </div>
+        <div className="grid grid-cols-1 gap-3">
+          <Field label="Home Address"><FieldInput value={address} onChange={setAddress} placeholder="Street, City" /></Field>
+        </div>
+
+        {/* ── Identity Documents ── */}
+        <FormSection title="Identity Documents" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="National ID"><FieldInput value={nationalId} onChange={setNationalId} /></Field>
+          <Field label="Passport Number"><FieldInput value={passportNumber} onChange={setPassportNumber} /></Field>
+        </div>
+
+        {/* ── Link Child (new parent only) ── */}
+        {!id && (
+          <>
+            <FormSection title="Link to Child (Student)" />
+            <div className="grid grid-cols-1 gap-3">
+              <Field label="Student">
+                <FieldSelect
+                  value={selectedStudentId}
+                  onChange={setSelectedStudentId}
+                  options={[
+                    { value: '', label: '— None / add later —' },
+                    ...allStudents.map((s: any) => ({ value: s.id, label: `${s.full_name} (${s.form}${s.class_name ? ' ' + s.class_name : ''})` })),
+                  ]}
+                />
+              </Field>
+            </div>
+          </>
+        )}
       </ModalBody>
       <ModalFoot>
         <Btn variant="outline" onClick={onClose}>Cancel</Btn>
