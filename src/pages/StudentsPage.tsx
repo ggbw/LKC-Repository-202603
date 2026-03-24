@@ -188,6 +188,33 @@ export default function StudentsPage() {
     showToast("Students exported");
   };
 
+  const handleDownloadTemplate = () => {
+    downloadExcel(
+      [
+        {
+          "Full Name": "",
+          Form: "",
+          Class: "",
+          Gender: "",
+          "Enrollment #": "",
+          Email: "",
+          "Date of Birth": "",
+          Nationality: "",
+          "Admission Date": "",
+          "Academic Year": "",
+          "Previous School": "",
+          "Blood Group": "",
+          "Medical Condition": "",
+          "National ID": "",
+          "Passport Number": "",
+        },
+      ],
+      "students_import_template",
+      "Students",
+    );
+    showToast("Template downloaded");
+  };
+
   const handleImport = async () => {
     const file = await triggerFileUpload();
     if (!file) return;
@@ -201,11 +228,19 @@ export default function StudentsPage() {
         const { error } = await supabase.from("students").insert({
           full_name: name,
           form,
-          gender: row["Gender"] || row["gender"] || null,
-          enrollment_number: row["Enrollment"] || row["enrollment_number"] || null,
+          gender: (row["Gender"] || row["gender"] || "").toLowerCase() || null,
+          enrollment_number: row["Enrollment #"] || row["Enrollment"] || row["enrollment_number"] || null,
+          class_name: row["Class"] || row["class_name"] || null,
           email: row["Email"] || row["email"] || null,
           nationality: row["Nationality"] || row["nationality"] || null,
           date_of_birth: row["Date of Birth"] || row["date_of_birth"] || null,
+          admission_date: row["Admission Date"] || row["admission_date"] || null,
+          academic_year: row["Academic Year"] || row["academic_year"] || null,
+          previous_school: row["Previous School"] || row["previous_school"] || null,
+          blood_group: row["Blood Group"] || row["blood_group"] || null,
+          medical_condition: row["Medical Condition"] || row["medical_condition"] || null,
+          national_id: row["National ID"] || row["national_id"] || null,
+          passport_number: row["Passport Number"] || row["passport_number"] || null,
           state: "active",
         });
         if (!error) count++;
@@ -292,10 +327,16 @@ export default function StudentsPage() {
             Export
           </Btn>
           {isAdmin && (
-            <Btn variant="outline" onClick={handleImport}>
-              <i className="fas fa-upload mr-1" />
-              Import
-            </Btn>
+            <>
+              <Btn variant="outline" onClick={handleDownloadTemplate}>
+                <i className="fas fa-file-excel mr-1" />
+                Template
+              </Btn>
+              <Btn variant="outline" onClick={handleImport}>
+                <i className="fas fa-upload mr-1" />
+                Import
+              </Btn>
+            </>
           )}
           {isAdmin && (
             <Btn onClick={() => setModal("new")}>
