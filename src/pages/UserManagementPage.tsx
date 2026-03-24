@@ -1365,8 +1365,8 @@ function CreateUserModal({
           />
         </Field>
 
-        {/* ── Link toggle (non-admin) ── */}
-        {["teacher", "student", "parent"].includes(role) && linkableRecords.length > 0 && (
+        {/* ── Link toggle (teacher & parent only — students always create new) ── */}
+        {["teacher", "parent"].includes(role) && linkableRecords.length > 0 && (
           <Field label={`Link to existing ${role} record?`}>
             {linkToggle}
             {linkMode === "existing" && (
