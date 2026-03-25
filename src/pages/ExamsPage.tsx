@@ -588,7 +588,7 @@ function ExamModal({ onClose }: { onClose: () => void }) {
   const [className, setClassName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [showOnReport, setShowOnReport] = useState(true);
+  const [showOnReport, setShowOnReport] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Derive available classes for the selected form

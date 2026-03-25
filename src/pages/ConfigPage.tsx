@@ -1980,7 +1980,7 @@ function SubjectStudentModal({
     return students.filter(
       (s: any) =>
         s.form === filterForm &&
-        s.state === "active" &&
+        (!s.state || s.state === "active" || s.state === "suspended") &&
         (!filterClass || s.class_name === filterClass) &&
         (!searchStr ||
           s.full_name.toLowerCase().includes(searchStr.toLowerCase()) ||
