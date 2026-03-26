@@ -344,4 +344,6 @@ function StudentModal({ id, students, onClose }: any) {
       </ModalBody>
       <ModalFoot><Btn variant="outline" onClick={onClose}>Cancel</Btn><Btn onClick={handleSave}>Save</Btn></ModalFoot>
     </Modal>
+  );
+}
 }
