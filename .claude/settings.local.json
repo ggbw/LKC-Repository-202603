@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(cmd /c \"cd /d \"\"C:\\\\Users\\\\Kgosi Motlhabane\\\\Documents\\\\GitHub\\\\LKC-Repository-202603\"\" && npm run build 2>&1\")",
+      "Bash(cmd /c \"cd /d \"\"C:\\\\Users\\\\Kgosi Motlhabane\\\\Documents\\\\GitHub\\\\LKC-Repository-202603\"\" && npx tsc --noEmit > tsc_output.txt 2>&1 && type tsc_output.txt\")",
+      "Bash(cmd /c \"cd /d \"\"C:\\\\Users\\\\Kgosi Motlhabane\\\\Documents\\\\GitHub\\\\LKC-Repository-202603\"\" && npx tsc --noEmit 1>tsc_out.txt 2>tsc_err.txt & echo done\")",
+      "Bash(node_modules/.bin/tsc --noEmit)"
+    ]
+  }
+}
