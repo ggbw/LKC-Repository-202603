@@ -1543,18 +1543,14 @@ function SubjectStudentTab({
   const [ssModal, setSsModal] = useState(false);
   const canManage = isAdmin || isClassTeacher;
 
-  // Class teachers only see their own students
-  const myStudentIds = useMemo(() => {
-    if (isAdmin || !myClassAssignments?.length) return null; // null = no restriction
-    return new Set(
-      students
-        .filter((s: any) => myClassAssignments.some((ca: any) => ca.form === s.form && ca.class_name === s.class_name))
-        .map((s: any) => s.id),
-    );
-  }, [isAdmin, myClassAssignments, students]);
-
   const filtered = studentSubjects.filter((ss: any) => {
-    if (myStudentIds && !myStudentIds.has(ss.student_id)) return false;
+    // Class teacher restriction: filter using the joined students data directly
+    if (!isAdmin && myClassAssignments?.length) {
+      const inMyClass = myClassAssignments.some(
+        (ca: any) => ca.form === ss.students?.form && ca.class_name === ss.students?.class_name,
+      );
+      if (!inMyClass) return false;
+    }
     return (!filterSubject || ss.subject_id === filterSubject) && (!filterForm || ss.students?.form === filterForm);
   });
 
