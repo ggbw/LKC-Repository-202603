@@ -228,7 +228,8 @@ export function useStudentSubjects(studentId?: string) {
     queryFn: async () => {
       let q = supabase
         .from("student_subjects")
-        .select("*, students(full_name, form, class_name), subjects(name, code), teachers(name)");
+        .select("*, students(full_name, form, class_name), subjects(name, code), teachers(name)")
+        .limit(10000);
       if (studentId) q = q.eq("student_id", studentId);
       const { data, error } = await q;
       if (error) throw error;
