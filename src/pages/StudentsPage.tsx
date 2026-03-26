@@ -346,4 +346,3 @@ function StudentModal({ id, students, onClose }: any) {
     </Modal>
   );
 }
-}
