@@ -1655,7 +1655,10 @@ function SubjectStudentTab({
       {ssModal && (
         <SubjectStudentModal
           subjects={subjects}
-          students={students.filter((s: any) => (myStudentIds ? myStudentIds.has(s.id) : true))}
+          students={students.filter((s: any) => {
+            if (!isClassTeacher || isAdmin || !myClassAssignments?.length) return true;
+            return myClassAssignments.some((ca: any) => ca.form === s.form && ca.class_name === s.class_name);
+          })}
           existingMappings={studentSubjects}
           myClassAssignments={myClassAssignments}
           isClassTeacher={isClassTeacher && !isAdmin}
