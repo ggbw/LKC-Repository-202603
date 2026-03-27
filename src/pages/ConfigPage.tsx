@@ -1543,15 +1543,25 @@ function SubjectStudentTab({
   const [ssModal, setSsModal] = useState(false);
   const canManage = isAdmin || isClassTeacher;
 
+  // Build a quick lookup so we can fall back when the join returns null
+  const studentMap = useMemo(() => {
+    const m: Record<string, any> = {};
+    for (const s of students) m[s.id] = s;
+    return m;
+  }, [students]);
+
   const filtered = studentSubjects.filter((ss: any) => {
-    // Class teacher restriction: filter using the joined students data directly
+    // Use join data first; fall back to the students array for orphaned rows
+    const student = ss.students || studentMap[ss.student_id];
     if (!isAdmin && myClassAssignments?.length) {
+      if (!student) return false;
       const inMyClass = myClassAssignments.some(
-        (ca: any) => ca.form === ss.students?.form && ca.class_name === ss.students?.class_name,
+        (ca: any) => ca.form === student.form && ca.class_name === student.class_name,
       );
       if (!inMyClass) return false;
     }
-    return (!filterSubject || ss.subject_id === filterSubject) && (!filterForm || ss.students?.form === filterForm);
+    const studentForm = student?.form;
+    return (!filterSubject || ss.subject_id === filterSubject) && (!filterForm || studentForm === filterForm);
   });
 
   const classLabel = myClassAssignments?.length
@@ -1617,13 +1627,15 @@ function SubjectStudentTab({
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 200).map((ss: any) => (
+                {filtered.slice(0, 200).map((ss: any) => {
+                  const st = ss.students || studentMap[ss.student_id];
+                  return (
                   <tr key={ss.id} style={{ borderBottom: "1px solid #f6f8fa" }}>
                     <td className="py-2.5 px-3.5 font-semibold">{ss.subjects?.name}</td>
-                    <td className="py-2.5 px-3.5">{ss.students?.full_name}</td>
+                    <td className="py-2.5 px-3.5">{st?.full_name || "—"}</td>
                     <td className="py-2.5 px-3.5 text-[11px]">
-                      {ss.students?.form}
-                      {ss.students?.class_name ? ` · ${ss.students.class_name}` : ""}
+                      {st?.form}
+                      {st?.class_name ? ` · ${st.class_name}` : ""}
                     </td>
                     <td className="py-2.5 px-3.5 text-[11px]">{ss.teachers?.name || "—"}</td>
                     {canManage && (
@@ -1642,7 +1654,8 @@ function SubjectStudentTab({
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <div className="text-[11px] mt-2" style={{ color: "hsl(var(--text2))" }}>
